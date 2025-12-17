@@ -129,7 +129,7 @@ sproutcheck<-sprout%>%
   select(Species, Treatment, IntakeDate, SproutDate, RemovalDate,DaysUntilEvent, notes)
 
 
-#going to remove these, removal date isnt noted for these
+#going to remove these NAs and -1, removal date isn't noted for these
 sprout<-sprout%>%
   filter(!is.na(DaysUntilEvent))%>%
   filter(DaysUntilEvent!="-1")
@@ -144,7 +144,7 @@ sproutcheck<-sprout%>%
   select(Treatment,Species,SproutDate, RemovalDate, notes, DaysUntilEvent)%>%
   filter(DaysUntilEvent==0)
 
-#looks like a prop was removed but date wasnt noted, so I am also going to remove this guy from the time series analysis, ok to keep for sprout or no sprout things, only one that has day until event 0 so will remove this row (i actually figured this out because i plotted the data and saw that one had been removed early, this is why its so important to visualize your data!!)
+#looks like a prop was removed but date wasn't noted, so I am also going to remove this guy from the time series analysis, ok to keep for sprout or no sprout things, only one that has day until event 0 so will remove this row (i actually figured this out because i plotted the data and saw that one had been removed early, this is why its so important to visualize your data!!)
 
 sprout<-sprout%>%
   filter(DaysUntilEvent!=0)
@@ -153,7 +153,7 @@ sprout<-sprout%>%
 
 #check how many in each treatment
 sproutcheck<-sprout%>%
-  group_by(Treatment)%>%
+  group_by(Species, Treatment)%>%
   summarise(n=n())
 
 #Air-175
@@ -174,31 +174,38 @@ LARA<-sprout%>%
 AVGE<-sprout%>%
   filter(Species=="AVGE")
 
+#looking at AVGEair treatment
+AVGEcheck<-AVGE%>%
+  filter(Treatment=="Air")
+
+LARAcheck<-LARA%>%
+  filter(Treatment=="Air")
+
 #now we create the survival object using these two columns we created in sprout (censoring status=sprouted or not 0/1, and time to event=time until sprouted or was removed)
 
 LARAsurv_obj <- Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted)
 AVGEsurv_obj<-Surv(time = AVGE$DaysUntilEvent, event = AVGE$sprouted)
 
-#Log Rank Test
+#Log Rank Test (run this so we can plot it)
 LARAsurv <- survfit(LARAsurv_obj ~ Treatment, data = LARA)
 AVGEsurv<- survfit(AVGEsurv_obj ~ Treatment, data = AVGE)
 
 #plotting LARA
-LARAplotobj<-ggsurvplot(LARAsurv, data=LARA,
-  palette = c("olivedrab","cornflowerblue","darkblue","salmon4"))
+LARAplotobj<-ggsurvplot(LARAsurv, data=LARA,fun="event",
+  palette = c("olivedrab","cornflowerblue","darkblue","salmon4"),conf.int = TRUE)
 
 LARAplotobj
 
-#the ggsurvplot doesn't just create a plot, it creates a list of things containing the plot, in order to add ggplot layers you have to pull the plot out of the list
+#the ggsurvplot() function doesn't just create a plot, it creates a list of things containing the plot, in order to add ggplot layers you have to pull the plot out of the list, then you can add titles and stuff on like normal
 
 LARAplot<-LARAplotobj$plot+ #pulling out the plot from the list
   ggtitle("LARA")+#adding ggplot things like normal
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5))
 LARAplot
 
 #plotting AVGE
-AVGEplotobj<-ggsurvplot(AVGEsurv, data=AVGE,
-  palette = c("olivedrab","cornflowerblue","darkblue","salmon4"))
+AVGEplotobj<-ggsurvplot(AVGEsurv, data=AVGE,fun="event",#makes it cumulative rather than countdown
+  palette = c("olivedrab","cornflowerblue","darkblue","salmon4"),conf.int = TRUE)
 AVGEplotobj
 
 
@@ -206,7 +213,7 @@ AVGEplotobj
 #same thing for AVGE
 AVGEplot<-AVGEplotobj$plot+ #pulling out the plot from the list
   ggtitle("AVGE")+#adding ggplot things like normal
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5))
 AVGEplot
 
 #now time to stat, log rank test to test for statistical differences between the curves
@@ -227,8 +234,12 @@ logRankAVGE
 
 # Chisq= 257  on 3 degrees of freedom, p= <2e-16
 
+#so we are looking at the number of samples in each treatment, the number that were observed to sprout, the number that would be expected if all treatments were the same, and the difference between observed and expected
+
+
+
 LogRankLARA<-survdiff(Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted) ~ Treatment, data = LARA)
-LogRankLARA
+print(LogRankLARA)
 
 #survdiff(formula = Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted) ~ 
 #    Treatment, data = LARA)
@@ -243,6 +254,7 @@ LogRankLARA
 
 #now that we know there is a difference between treatments want to take into account the other variables use a Cox regression analysis to incorporate 
 
+#so we are looking at the number of samples in each treatment, the number that were observed to sprout, the number that would be expected if all treatments were the same, and the difference between observed and expected
 ```
 
 Cox Regression 
@@ -252,81 +264,20 @@ str(LARA)
 LARA$Float<-as.factor(LARA$Float)
 LARA$Treatment<-as.factor(LARA$Treatment)
 LARA<-as.data.frame(LARA)
+LARA$SiteID<-as.factor(LARA$SiteID)
 
 #now that we know there is a difference between treatments want to take into account the other variables use a Cox regression analysis to incorporate 
 
-LARAcox<-coxph(Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted)~Treatment+SiteID+Mass, data=LARA)
+LARAcox<-coxph(Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted)~Treatment+SiteID+Mass+Float, data=LARA)
 
 LARAcox
+#2627.494
 
 
-AVGEcox<-coxph()
 
-# Cox regression ======================================================
-# Fit the model
-cox_res <- coxph(Surv(dtime_yrs, status) ~ hormon + chemo + size + er + pgr + nodes + meno + grade + age, data = df)
-cox_res
+
+AVGEcox<-coxph(Surv(time = AVGE$DaysUntilEvent, event = AVGE$sprouted)~Treatment+SiteID+Mass+Float, data=AVGE)
+
+AVGEcox
 ```
 
-Stat squid Kaplin Meyer tutorial
-```{r Kaplin Meyer Survival Curve}
-library(survival)
-library(ggsurvfit)
-library(survminer)
-library(tidyverse)
-
-#this is me stepping through the tutorial 
-df <- survival::rotterdam
-
-#censoring status: the values in this column are 1 = event happened, 0 = censored (or TRUE and FALSE). 
-
-    #so in my case this would mean yes it sprouted, no it did not sprout
-
-
-#time to event: from the start time (e.g., time of diagnosis) to the end time (the event happened or the last day of follow-up
-
-
-df <- df %>% mutate(status = death)
-table(df$status)
-df <- df %>% mutate(dtime_yrs = dtime/365.25)
-surv_obj <- Surv(time = df$dtime_yrs, event = df$status)
-
-
-s1 <- survfit(surv_obj ~ 1, data = df)
-summary(s1)
-
-#plot 
-km_curve <- ggsurvfit(s1, linewidth = 1) +
-  labs(x = 'Years', y = 'Overall survival') +
-  add_confidence_interval() +
-  add_risktable() +
-  scale_ggsurvfit() + 
-  coord_cartesian(xlim = c(0, 8))
-
-km_curve
-
-s2 <- survfit(surv_obj ~ chemo, data = df)
-ggsurvplot(s2, data = df,
-           size = 1,
-           palette = c('#E7B800', '#2e9fdf'),
-           censor.shape = '|', censor.size = 4,
-           conf.int = TRUE,
-           pval = TRUE,
-           risk.table = TRUE,
-           risk.table.col = 'strata',
-           legend.labs = list('0' = 'No chemo', '1' = 'Chemo'),
-           risk.table.height = 0.25,
-           ggtheme = theme_bw())
-
-#log rank test
-logrankres_chemo <- survdiff(Surv(dtime_yrs, status) ~ chemo, data = df)
-logrankres_chemo
-
-logrankres_hor <- survdiff(Surv(dtime_yrs, status) ~ hormon, data = df)
-logrankres_hor
-
-
-#cox test
-cox_res <- coxph(Surv(dtime_yrs, status) ~ hormon + chemo + size + er + pgr + nodes + meno + grade + age, data = df)
-cox_res
-```
