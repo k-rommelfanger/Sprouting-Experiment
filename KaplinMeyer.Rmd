@@ -39,6 +39,7 @@ sprout$sprouted<-ifelse(sprout$SproutDate=="NA",'0','1')
 #made not sprouted NA instead of 0, so changing NA to 0 in sprouted column
 sprout$sprouted[is.na(sprout$sprouted)]<-0
 
+#recoding STEER Basin to STEER so Figures match 
 sprout$SiteID<-gsub("STEER Basin", "STEER", sprout$SiteID)
 
 
@@ -118,8 +119,8 @@ sprout<-sprout%>%
   mutate(DaysUntilEvent=  #making a new column
   ifelse(
   is.na(sprout$SproutDate), #if there is an NA in sproutdate
-  RemovalDate -IntakeDate,  #then going to subtract removal date
-  SproutDate -IntakeDate )) #if there is anything but an NA, then subtract sprout date
+  RemovalDate -IntakeDate,  #then going to subtract removal date (calculates days until removal)
+  SproutDate -IntakeDate )) #if there is anything but an NA, then subtract sprout date (calculates days until sprouting)
 
 #looking at my new columns to make sure everything is Kosher
 unique(sprout$DaysUntilEvent)
@@ -129,7 +130,7 @@ sproutcheck<-sprout%>%
   select(Species, Treatment, IntakeDate, SproutDate, RemovalDate,DaysUntilEvent, notes)
 
 
-#going to remove these NAs and -1, removal date isn't noted for these
+#going to remove these NAs and -1, removal date isn't noted for these so they shouldnt be included in analysis
 sprout<-sprout%>%
   filter(!is.na(DaysUntilEvent))%>%
   filter(DaysUntilEvent!="-1")
@@ -149,17 +150,17 @@ sproutcheck<-sprout%>%
 sprout<-sprout%>%
   filter(DaysUntilEvent!=0)
 
-#ok data looks clean now, ok to leave a lot of these for binary analysis (sprout not sprout 0/1) but need to remove for time series analysis because dont know date of removal or sprouting
+# data looks clean now, ok to leave a lot of these for binary analysis (sprout not sprout 0/1) but need to remove for time series analysis because don't know date of removal or sprouting
 
 #check how many in each treatment
 sproutcheck<-sprout%>%
   group_by(Species, Treatment)%>%
   summarise(n=n())
 
-#Air-175
-#Fresh-177
-#Salt-179
-#Soil-180
+#Air-175 LARA 88 AVGE 87
+#Fresh-177 LARA 89 AVGE 88
+#Salt-179 LARA 89 AVGE 90
+#Soil-180 LARA 90 AVGE 90
 
 
 #check to make sure my columns are numeric
@@ -174,13 +175,6 @@ LARA<-sprout%>%
 AVGE<-sprout%>%
   filter(Species=="AVGE")
 
-#looking at AVGEair treatment
-AVGEcheck<-AVGE%>%
-  filter(Treatment=="Air")
-
-LARAcheck<-LARA%>%
-  filter(Treatment=="Air")
-
 #now we create the survival object using these two columns we created in sprout (censoring status=sprouted or not 0/1, and time to event=time until sprouted or was removed)
 
 LARAsurv_obj <- Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted)
@@ -190,7 +184,7 @@ AVGEsurv_obj<-Surv(time = AVGE$DaysUntilEvent, event = AVGE$sprouted)
 LARAsurv <- survfit(LARAsurv_obj ~ Treatment, data = LARA)
 AVGEsurv<- survfit(AVGEsurv_obj ~ Treatment, data = AVGE)
 
-#plotting LARA
+#plotting LARA (fun=event plots it so it is time until event not number alive over time)
 LARAplotobj<-ggsurvplot(LARAsurv, data=LARA,fun="event",
   palette = c("olivedrab","cornflowerblue","darkblue","salmon4"),conf.int = TRUE)
 
@@ -259,20 +253,40 @@ print(LogRankLARA)
 
 Cox Regression 
 ``` {r}
-
+#looking at the structure of the dataframe and reclassifying things
 str(LARA)
 LARA$Float<-as.factor(LARA$Float)
 LARA$Treatment<-as.factor(LARA$Treatment)
 LARA<-as.data.frame(LARA)
 LARA$SiteID<-as.factor(LARA$SiteID)
 
+str(LARA)
+
 #now that we know there is a difference between treatments want to take into account the other variables use a Cox regression analysis to incorporate 
 
-LARAcox<-coxph(Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted)~Treatment+SiteID+Mass+Float, data=LARA)
+#using a size characteristic, siteID, and Treatment
+#not going to include float because they all basically flaoted
+
+LARAcox<-coxph(Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted)~Treatment+SiteID+Mass, data=LARA)
 
 LARAcox
-#2627.494
+#Call:
+#coxph(formula = Surv(time = LARA$DaysUntilEvent, event = LARA$sprouted) ~ 
+#    Treatment + SiteID + Mass, data = LARA)
 
+#                          coef exp(coef) se(coef)      z        p
+#TreatmentFresh          2.3905   10.9194   0.2337 10.231  < 2e-16
+#TreatmentSalt           1.8740    6.5145   0.2317  8.090 5.98e-16
+#TreatmentSoil           1.2685    3.5554   0.2329  5.445 5.17e-08
+#SiteIDSTEER             0.2101    1.2338   0.1568  1.339  0.18042
+#SiteIDVessup Salt Pond  0.1666    1.1813   0.1610  1.035  0.30085
+#Mass                    0.7547    2.1270   0.2678  2.818  0.00483
+
+#Likelihood ratio test=154.3  on 6 df, p=< 2.2e-16
+#n= 356, number of events= 261 
+
+summary(LARAcox)
+#this is the output of the cox regression
 
 
 
