@@ -288,6 +288,12 @@ LARAcox
 summary(LARAcox)
 #this is the output of the cox regression
 
+#now testing cox proportional hazards 
+fit <- coxph(Surv(DaysUntilEvent, sprouted) ~ Treatment + SiteID + Mass,
+             data = LARA)
+
+ph_test <- cox.zph(fit)
+print(ph_test)
 
 
 AVGEcox<-coxph(Surv(time = AVGE$DaysUntilEvent, event = AVGE$sprouted)~Treatment+SiteID+Mass+Float, data=AVGE)
