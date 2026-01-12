@@ -115,9 +115,6 @@ AVGEFbar1
 
 #they are looking semi evenish, enough that floated and sank in each treatment
 
-
-
-
 #Buoyancy compared across collection sites, info for table 2
 
 #LARA across sites
@@ -191,11 +188,11 @@ Float
 
 
 
+#more sink from compass and steer, more float from vessup salt pond going to test statistical difference with chi squared test
+
 #good chi square test reference
 
 #https://lukaswallrich.github.io/GoldCoreQuants/chi-squared-tests-for-associations-between-categorical-variables.html 
-
-#more sink from compass and steer, more float from vessup salt pond going to test statistical difference with chi squared test
 
 chiframe<-siteAVGE%>%
   pivot_wider(names_from = Float, values_from = count)
@@ -207,9 +204,6 @@ chitest
 
 #data:  chiframe[, -1]
 #X-squared = 68.152, df = 2, p-value = 1.589e-15
-
-
-#post hoc
 
 
 chitest$expected
@@ -226,28 +220,30 @@ chitest$residuals
 ```
 
 
-mean and sem of intake characteristics (MEAN/SEM Intake Variables Table X)
+Calculating mean and sem of intake characteristics (MEAN/SEM Intake Variables Table X)
 
 ```{r Mean and St Dev}
 
 library(plotrix)#for SEM
 
-
+#this is calculating mean Mass, Length, width and radicle lenght for AVGE
 AVGEsum<-AVGE%>%
   group_by(SiteID)%>%
   summarise(meanmass=mean(Mass), meanlenght=mean(PropaguleLength), meanWidth=mean(`Width-mm`), meanRad=mean(`IntakeRadicleLength-cm`))
  
 
-
+#this calculates standard error for each of the above metrics
 AVGEsem<-AVGE%>%
   group_by(SiteID)%>%
   summarise(SEMmass=std.error(Mass), SEMlenght=std.error(PropaguleLength), SEMWidth=std.error(`Width-mm`),SEMrad=std.error(`IntakeRadicleLength-cm`))
 
+
+#calculating means for LARA
 LARAsum<-LARA%>%
   group_by(SiteID)%>%
   summarise(meanmass=mean(Mass), meanlenght=mean(PropaguleLength), meanWidth=mean(`Width-mm`))
 
-
+#LARA SEM
 LARAsem<-LARA%>%
   group_by(SiteID)%>%
   summarise(SEMmass=std.error(Mass), SEMlenght=std.error(PropaguleLength), SEMWidth=std.error(`Width-mm`))
@@ -524,8 +520,6 @@ cldList(comparison = Lab1$Comparison,
 #2     STEERBasin      b          b
 #3 VessupSaltPond     a        a
 
-
-
 #Width is next!
 
 #check assumptions and try transformations
@@ -760,13 +754,14 @@ ggsave(
 ```
 
 
-Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted AVGE, ran multiple logistic regressions, best one with lowest AIC, results pasted into code (Table 4)
+Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted AVGE, ran multiple logistic regressions, compared with AIC (Table 4) Plotting and checking correlation
 
 ```{r Logits AVGE Only}
 library(car)#for calculating VIF, test how correlation looks
 library(DHARMa)#for simulate residuals, to check assumptions
 library(patchwork)
 
+#exploring plotting the data
 #Length
 ggplot(data = AVGE, aes(x = PropaguleLength, y = sprouted, color=Treatment)) +
   geom_point(alpha = 0.1) +
@@ -784,7 +779,6 @@ ggplot(data = AVGE, aes(x = `Width-mm`, y = sprouted, color=Treatment)) +
 ggplot(data = AVGE, aes(x = `IntakeRadicleLength-cm`, y = sprouted, color=Treatment)) +
   geom_point(alpha = 0.1) +
   geom_smooth(method = "glm", method.args = list(family ="binomial"))
-
 
 
 #multiply l*w then see, to get propagule area 
@@ -826,86 +820,12 @@ print(cor_matrix)
 #https://statisticsbyjim.com/regression/multicollinearity-in-regression-analysis/
 
 
-
-#start looking at just site and whether or not things float only
-BasicLogit<-glm(sprouted~SiteID+Float+Treatment, data=AVGE, family="binomial")
-summary(BasicLogit)
-#192
-
-#now looking to see if adding size info makes for a better model
-
-
-LengthLogit<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
-summary(LengthLogit)
-#190.43
-
-WidthLogit<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
-summary(WidthLogit)
-#193.99
-
-masslogit<-glm(sprouted~SiteID+Float+Treatment+Mass, data=AVGE, family="binomial")
-summary(masslogit)
-#193.81
-
-#mass, no site
-NoSMassLogit<-glm(sprouted~Float+Treatment+Mass, data=AVGE, family="binomial")
-summary(NoSMassLogit)
-#191.59
-
-#exclude site not significant (Best Model!)
-NoSLengthLogit<-glm(sprouted~Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
-summary(NoSLengthLogit)
-
-
-
-#Call:
-#glm(formula = sprouted ~ Float + Treatment + PropaguleLength, 
-#    family = "binomial", data = AVGE)
-
-#Coefficients:
-#                Estimate Std. Error z value Pr(>|z|)    
-#(Intercept)     -0.09751    1.21083  -0.081   0.9358    
-#FloatY           0.81447    0.43824   1.859   0.0631 .  
-#TreatmentFresh   6.35464    1.06185   5.984 2.17e-09 ***
-#TreatmentSalt    5.81797    0.81183   7.166 7.70e-13 ***
-#TreatmentSoil    3.56103    0.44185   8.059 7.67e-16 ***
-#PropaguleLength -0.90716    0.55774  -1.626   0.1038    
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-#(Dispersion parameter for binomial family taken to be 1)
-
-#    Null deviance: 405.89  on 357  degrees of freedom
-#Residual deviance: 176.85  on 352  degrees of freedom
-#AIC: 188.85
-
-#Number of Fisher Scoring iterations: 7
-
-exp(coef(NoSLengthLogit))
-
-#    (Intercept)          FloatY  TreatmentFresh   TreatmentSalt   TreatmentSoil PropaguleLength 
-#      0.9070952       2.2579843     575.1558966     336.2878650      35.1996004       0.4036688
-
-NoSWidthLogit<-glm(sprouted~Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
-summary(NoSWidthLogit)
-#191.46
-
-Basic<-glm(sprouted~Treatment+SiteID, data=AVGE, family="binomial")
-summary(Basic)
-#191.94
-
-Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
-summary(Basic1)
-#189.94
-
 ```
 
 
 
 
 Rerunning all combonations of AVGE logistic regressions
-
-NEED TO READ INTO QQ PLOT THINGS
 ```{r}
 #treatment only
 Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
@@ -1026,12 +946,13 @@ summary(masslogit)
 
 
 Making a figure predicting sprouting using the best model generated for AVGE
-```{r}
-#here I am creating a new dataframe to hold the predicted values, I am keeping length constant at the mean length value, so predicted values only reflect treatment and bouyancy, expand.grid creates all combos of supplied vectors (my float and treatment vectors) keeping propagule length constant at the mean
+```{r AVGE logit Figure}
+#here I am creating a new dataframe to hold the predicted values, I am keeping length constant at the mean length value, so predicted values only reflect treatment and buoyancy, expand.grid creates all combos of supplied vectors (my float and treatment vectors) keeping propagule length constant at the mean
 AVGEpredict<- expand.grid(
   Float = c("Y", "N"), #two bouyancy options
   Treatment = c("Fresh", "Salt", "Soil", "Air"), #four treatment options
   PropaguleLength = mean(AVGE$PropaguleLength))  # hold length constant
+
 
 # we are generating data for each treatment using the model created from our experimental data here, predict(mylogitmodel, newdf, type=return linear predictor log odds, not translate to probablitiles, also give SE)
 AVGEpredict1 <- predict(NoSLengthLogit, AVGEpredict, type = "link", se.fit = TRUE)
@@ -1065,7 +986,7 @@ AVGElogitplot
 
 rerunning all combinations of LARA logistic regression, not including bouyancy for this one because not enough representation of sinking
 
-```{r}
+```{r LARA logit}
 #treatment only
 Basic1<-glm(sprouted~Treatment, data=LARA, family="binomial")
 summary(Basic1)
@@ -1139,33 +1060,35 @@ summary(BasicM)
 Now plotting the best model using predict
 
 ```{r}
-
+library(patchwork)
+#making treatment a factor
 LARA$Treatment<-as.factor(LARA$Treatment)
 
-# Mass sequence (100 points across observed range)
+# Mass sequence (generating 100 evenly spaced mass points across observed range from data)
 mass_seq <- seq(
   from = min(LARA$Mass),
   to   = max(LARA$Mass),
   length.out = 100
 )
 
-# New data for prediction
+# Makes it so each mass value has a corresponding place for each of the four levels of treatment in my LARA df
 LARApredict <- expand.grid(
   Mass = mass_seq,
   Treatment = levels(LARA$Treatment)
 )
 
+#treatment is a factor, same as when model was fitted
 LARApredict$Treatment <- factor(LARApredict$Treatment, levels = levels(LARA$Treatment))
 
 
-# Predict on link scale with standard errors
+# Predict values using my model, on link scale with standard errors calculated for each value
 pred <- predict(BasicM, newdata = LARApredict, type = "link", se.fit = TRUE)
 
-# Add fit and SE to newdat
+# Add fit and SE generated by predict to LARApredict df
 LARApredict$fit <- pred$fit
 LARApredict$se <- pred$se.fit
 
-# 95% confidence interval on link scale, then back-transform to probability
+# these were calculated on the log scale, which is how results are presented in logit, converting to probability scale (using plogis) for plotting both predicted values and 95% (1.96)confidence intervals
 LARApredict$lower <- plogis(LARApredict$fit - 1.96 * LARApredict$se)
 LARApredict$upper <- plogis(LARApredict$fit + 1.96 * LARApredict$se)
 LARApredict$pred_prob <- plogis(LARApredict$fit)
@@ -1176,168 +1099,28 @@ LARApredplot<-ggplot(LARApredict, aes(x = Mass, y = pred_prob, color = Treatment
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = NA) +
   geom_point(data = LARA, aes(x = Mass, y = sprouted, color=Treatment), height = 0.03, alpha = 0.3, inherit.aes = FALSE) +
   labs(x = "Propagule mass", y = "Predicted probability of sprouting") +
-  theme_classic()+
+  ggtitle(expression(italic("L. racesmosa")~"Predicted Sprouting Probability"))+
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
   scale_fill_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
   scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))
 
 LARApredplot
+
+
+#combine both plots into a single figure
+
+logitplot<-LARApredplot+AVGElogitplot
+logitplot
+
+ggsave(
+  filename = "logitplot.jpg",  # output file name
+  plot = logitplot,            # your ggplot object
+  width = 3000,                      # width in pixels
+  height = 1500,                     # height in pixels
+  units = "px",                      # set units to pixels
+  dpi = 300                          # resolution
+)
 ```
-
-
-
-
-To cleanup code, this doesnt currently work want to make a function to run all the logisitic regressions, then can run for all poissons/logistic regressions
-
-
-```{r}
-
-explanitorylist<-c("Treatment","Treatment + SiteID","Treatment + Buoyancy", "Treatment + Length","Treatment + Width", "Treatment + Mass", "Treatment + Buoyancy + Length", "Treatment + Buoyancy + Width","Treatment + Buoyancy + Mass","Treatment + SiteID + Buoyancy","Treatment + SiteID + Buoyancy + Length","Treatment + SiteID + Buoyancy + Width", "Treatment + SiteID + Buoyancy + Mass")
-
-#writing a function to loop through all of these and put them as 
-function(list,responseVAR, data, model){
-  for ()
-  glm(response~[i] )
-  
-}
-run_logistic_models <- function(data, response) {
-  
-  # List of model formulas as strings
-  model_formulas <- c(
-    "Treatment",
-    "Treatment + SiteID",
-    "Treatment + Buoyancy",
-    "Treatment + Length",
-    "Treatment + Width",
-    "Treatment + Mass",
-    "Treatment + Buoyancy + Length",
-    "Treatment + Buoyancy + Width",
-    "Treatment + Buoyancy + Mass",
-    "Treatment + SiteID + Buoyancy",
-    "Treatment + SiteID + Buoyancy + Length",
-    "Treatment + SiteID + Buoyancy + Width",
-    "Treatment + SiteID + Buoyancy + Mass"
-  )
-  
-  # Initialize lists to store models and AICs
-  models <- list()
-  aic_values <- numeric(length(model_formulas))
-  
-  # Fit each model
-  for (i in seq_along(model_formulas)) {
-    f <- as.formula(paste(response, "~", model_formulas[i]))
-    fit <- glm(f, data = data, family = binomial)
-    models[[i]] <- fit
-    aic_values[i] <- AIC(fit)
-  }
-  
-  # Create AIC table
-  aic_table <- data.frame(
-    Model = model_formulas,
-    AIC = aic_values,
-    stringsAsFactors = FALSE
-  )
-  
-  # Calculate ΔAIC
-  aic_table$Delta_AIC <- aic_table$AIC - min(aic_table$AIC)
-  
-  # Calculate AIC weights
-  aic_table$Weight <- exp(-0.5 * aic_table$Delta_AIC) /
-    sum(exp(-0.5 * aic_table$Delta_AIC))
-  
-  # Sort by AIC
-  aic_table <- aic_table[order(aic_table$AIC), ]
-  
-  return(list(AIC_table = aic_table, Models = models))
-}
-
-
-```
-
-sprouted 0/1, LARA logisitic regression best model included Table 6 
-```{r LARA Only Logit}
-library(DHARMa)#for simulate residuals, to check assumptions
-
-#Length
-ggplot(data = LARA, aes(x = PropaguleLength, y = sprouted, color=Treatment)) +
-  geom_point(alpha = 0.1) +
-  geom_smooth(method = "glm", method.args = list(family ="binomial"))
-#mass
-ggplot(data = LARA, aes(x = Mass, y = sprouted, color=Treatment)) +
-  geom_point(alpha = 0.1) +
-  geom_smooth(method = "glm", method.args = list(family ="binomial"))
-#width
-ggplot(data = LARA, aes(x = `Width-mm`, y = sprouted, color=Treatment)) +
-  geom_point(alpha = 0.1) +
-  geom_smooth(method = "glm", method.args = list(family ="binomial"))
-
-
-#check for correlation 
-cor_matrix1 <- cor(LARA[, c("PropaguleLength", "Width-mm", "Mass")], use = "complete.obs")
-
-print(cor_matrix1)
-#                PropaguleLength  Width-mm      Mass
-#PropaguleLength       1.0000000 0.3632334 0.7385917
-#Width-mm              0.3632334 1.0000000 0.4120326
-#Mass                  0.7385917 0.4120326 1.0000000
-
-#length and mass are highly correlated so going to decide which ones to include
-
-
-#start not including in size 
-BasicLGlm<-glm(sprouted~Treatment+SiteID, data=LARA, family="binomial")
-summary(BasicLGlm)
-#292.12
-
-#length site ID, treatment 
-PropCharGlm<-glm(sprouted~Treatment+SiteID+PropaguleLength, data=LARA, family="binomial")
-
-summary(PropCharGlm)
-##AIC: 289.44
-
-#mass, treatment and site ID are best
-PropCharGlm<-glm(sprouted~Treatment+SiteID+Mass, data=LARA, family="binomial")
-
-summary(PropCharGlm)
-#Call:
-#glm(formula = sprouted ~ Treatment + SiteID + Mass, family = "binomial", 
-#    data = LARA)
-
-#Coefficients:
-#                       Estimate Std. Error z value Pr(>|z|)    
-#(Intercept)             -3.1103     0.8483  -3.667 0.000246 ***
-#TreatmentFresh           3.7761     0.5317   7.101 1.23e-12 ***
-#TreatmentSalt            3.8408     0.5680   6.762 1.36e-11 ***
-#TreatmentSoil            2.1242     0.3606   5.890 3.86e-09 ***
-#SiteIDSTEER Basin        0.7820     0.4315   1.812 0.069921 .  
-#SiteIDVessup Salt Pond   0.2970     0.4044   0.735 0.462633    
-#Mass                     3.3283     1.1574   2.876 0.004030 ** 
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-#(Dispersion parameter for binomial family taken to be 1)
-
-#    Null deviance: 405.40  on 346  degrees of freedom
-#Residual deviance: 271.04  on 340  degrees of freedom
-#AIC: 285.04
-
-#Number of Fisher Scoring iterations: 5
-
-#make coefficents easier to interpret
-exp(coef(PropCharGlm))
-
-#   (Intercept)         TreatmentFresh          TreatmentSalt          TreatmentSoil      SiteIDSTEER Basin 
-#            0.04458632            43.64358187            46.56385111             8.36608509             2.18579481 
-#SiteIDVessup Salt Pond                   Mass 
-#            1.34587672            27.89082665
-
-#exclude site ID, 
-PropCharGlm<-glm(sprouted~Treatment+Mass, data=LARA, family="binomial")
-
-summary(PropCharGlm)
-#284.57 (not different enough to be better going to include site id )
-
-```
-
 
 Calculate days until sprouting visualize prop characterisics vs time until sprout to see if it looks like any prop characteristics have any effect on time until sprout!
 
@@ -1352,6 +1135,9 @@ lubesprout$DaysUntilSprout<-(lubesprout$SproutDate-lubesprout$IntakeDate)
 #when it subtracts the two dates from each other it says X days, i want just the number so I am separating these two columns, with the space inbetween, so i have just a number in the days until sprout column
 lubesprout<-lubesprout%>%separate(DaysUntilSprout, into = c("DaysUntilSprout","Day"), sep = " ")
 #now it no longer knows what day is, so it changes it to an NA.
+
+#one NA because no sproutdate
+lubesprout <- lubesprout[!is.na(lubesprout$DaysUntilSprout), ]
 
 #look at propagule things to see if any affect on duration to sprouting
 #now plot the data with our factors to see if we thing there is a relationship 
@@ -2322,9 +2108,6 @@ totalpatchplot<-LARApropplot+AVGEpropplot+plot_layout(guides = 'collect')
 totalpatchplot
 
 ```
-
-
-
 
 
 This is running a KW test for LARA with the ones that didnt sprout removed plotting results for LARA

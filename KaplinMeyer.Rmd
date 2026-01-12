@@ -7,17 +7,13 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r Explore something}
+```{r Cleaning Data}
 library(readr)
 library(tidyverse)
 
 #removed the two reps where intake radicle length was 10 in excel prior to import, this length is impossible 
 
 sprout <- read_csv("Sprouting Experiment/data/E1 LARA_AVGE intake experiment Fall 2022 - MasterData.csv")
-unique(sprout$IntakeDate)
-#have a row that is all NAs, removing
-sprout<-sprout%>%
-  filter(!is.na(IntakeDate))
 
 sprout<-sprout%>%filter(`IntakeDate`!="11/7/22")#remove the one random intake on 11/7 
 
@@ -39,7 +35,6 @@ sprout$sprouted<-ifelse(sprout$SproutDate=="NA",'0','1')
 #made not sprouted NA instead of 0, so changing NA to 0 in sprouted column
 sprout$sprouted[is.na(sprout$sprouted)]<-0
 
-#recoding STEER Basin to STEER so Figures match 
 sprout$SiteID<-gsub("STEER Basin", "STEER", sprout$SiteID)
 
 
@@ -48,26 +43,33 @@ LARA<-sprout%>%filter(Species=="LARA")
 AVGE<-sprout%>%filter(Species=="AVGE")
 
 
-
-
 #going to remove an outlier in AVGE (likely typo)
 AVGE<-AVGE%>%
   filter(PropaguleLength!=0.40)
+#dont think these are actually outliers, i think they were measured in cm, convert to mm
+AVGE<-AVGE%>%
+  mutate(`Width-mm`=if_else(`Width-mm`<7, `Width-mm`*10, `Width-mm`))
 #more outliers (likely typos too)
-AVGE<-AVGE%>%
-  filter(`Width-mm`!=1.3)
-AVGE<-AVGE%>%
-  filter(`Width-mm`!=1.5)
-AVGE<-AVGE%>%
-  filter(`Width-mm`!=1.7)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.3)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.5)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.7)
 
-#remove outliers in LARA (likely errors)
+
+
+# i think these were likely accidentally measured in cm, going to convert to mm
 LARA<-LARA%>%
-  filter(`Width-mm`>=4)
-LARA<-LARA%>%
-  filter(`Width-mm`<=14)
-LARA<-LARA%>%
-  filter(Mass<=1.66)
+  mutate(`Width-mm`=if_else(`Width-mm`<4, `Width-mm`*10, `Width-mm`))
+#LARA<-LARA%>%
+ # filter(`Width-mm`>=4)
+
+#changed my mind on this I don't think these are actually outliers leaving them in
+#LARA<-LARA%>%
+#  filter(`Width-mm`<=14)
+#LARA<-LARA%>%
+#  filter(Mass<=1.66)
 
 
 #sprouted as numeric
@@ -81,25 +83,28 @@ AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
 #sproutdate and intake date as dates
 sprout$SproutDate<-mdy(sprout$SproutDate)
 sprout$IntakeDate<-mdy(sprout$IntakeDate)
-sprout$RemovalDate<-mdy(sprout$RemovalDate)
 ```
+
 
 Looking at the number that sprouted and number that were removed for other reasons, this includes the ones that were removed later for intake characteristics that were outliers, that is why some of the percentages are different than previously generated ones, fixed in table. NEED TO UPDATE IN METHODS THAT SOME WERE REMOVED FOR ANALYSIS BECAUSE OF BAD INTAKE DATA
 ```{r}
 #we have an NA here for reason for removal, but notes show that the prop was really removed because it was moldy so going to fix
 sprout$ReasonForRemoval[is.na(sprout$ReasonForRemoval) & sprout$sprouted == 0] <- "mold"
 
+#this is taking sprout and organizing by species and treatment so I can see how many in each treatment were removed for each reason
 totalprops<-sprout%>%
   group_by(Species, Treatment, ReasonForRemoval)%>%
   summarise(N=n())%>%
   pivot_wider(names_from = ReasonForRemoval , values_from = N )
 
+#when i pivot wider, na's show up in columns with no props that were removed for that reason, make zero
 totalprops[is.na(totalprops)]<-0
 
+#calculating percentages of total props for each 
 totalprops<-totalprops%>%
   mutate(TotalProps=(UKN+dead+mold+`NA`+`experiment end`+lost+predation))%>%
   mutate(LUNK=(lost+UKN))%>%
-  mutate(Pdead=dead/TotalProps, Pmold=mold/TotalProps, Psprout=`NA`/TotalProps, pend=`experiment end`/TotalProps, PPred=predation/TotalProps, PUnk=LUNK/TotalProps)%>%
+  mutate(Pdead=dead/TotalProps, Pmold=mold/TotalProps, Psprout=`NA`/TotalProps, pend=`experiment end`/TotalProps, PPred=predation/TotalProps, PUnk=LUNK/TotalProps)#%>%
   select(Species, Treatment, LUNK)
 ```
 
