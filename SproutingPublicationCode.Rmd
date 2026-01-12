@@ -45,21 +45,30 @@ AVGE<-sprout%>%filter(Species=="AVGE")
 #going to remove an outlier in AVGE (likely typo)
 AVGE<-AVGE%>%
   filter(PropaguleLength!=0.40)
+#dont think these are actually outliers, i think they were measured in cm, convert to mm
+AVGE<-AVGE%>%
+  mutate(`Width-mm`=if_else(`Width-mm`<7, `Width-mm`*10, `Width-mm`))
 #more outliers (likely typos too)
-AVGE<-AVGE%>%
-  filter(`Width-mm`!=1.3)
-AVGE<-AVGE%>%
-  filter(`Width-mm`!=1.5)
-AVGE<-AVGE%>%
-  filter(`Width-mm`!=1.7)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.3)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.5)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.7)
 
-#remove outliers in LARA (likely errors)
+
+
+# i think these were likely accidentally measured in cm, going to convert to mm
 LARA<-LARA%>%
-  filter(`Width-mm`>=4)
-LARA<-LARA%>%
-  filter(`Width-mm`<=14)
-LARA<-LARA%>%
-  filter(Mass<=1.66)
+  mutate(`Width-mm`=if_else(`Width-mm`<4, `Width-mm`*10, `Width-mm`))
+#LARA<-LARA%>%
+ # filter(`Width-mm`>=4)
+
+#changed my mind on this I don't think these are actually outliers leaving them in
+#LARA<-LARA%>%
+#  filter(`Width-mm`<=14)
+#LARA<-LARA%>%
+#  filter(Mass<=1.66)
 
 
 #sprouted as numeric
@@ -82,7 +91,7 @@ Look at propagule bouyancy across collection sites, and across treatments
 #library(rcompanion)#posthoctest
 library(ggpattern)
 library(patchwork)
-library(chisq.posthoc.test)
+
 
 #bouyancy compared across treatments
 
@@ -117,10 +126,7 @@ siteLARA <- LARA %>%
   summarise(count = n(), .groups = "drop")
 #spread semi evenly across sites
 
-#adding a row for STEER did not float with value of 0
-siteLARA <- rbind(
-  siteLARA,
-  data.frame(SiteID = "STEER", count = 0, Float = "N"))
+
 
 #this is looking at the total number of AVGE props from each site that floated or not
 siteAVGE <- AVGE %>%
@@ -135,7 +141,7 @@ AVGEFbar1<-ggplot(data=siteAVGE, aes(x=SiteID, y=count, fill=Float))+
 AVGEFbar1
 
 #count of number that floated vs sank
-npropsAVGE<-c("n=87","n=30","n=80","n=38","n=30","n=89")
+npropsAVGE<-c("n=87","n=31","n=82","n=38","n=30","n=89")
 
 #making a nice version of this plot, how many floated/sank from each site (this plot Figure 3)
 AVGEFbar1<-ggplot(data=siteAVGE, aes(x=SiteID, y=count, fill=Float))+
@@ -159,7 +165,7 @@ AVGEFbar1
 siteLARA<-siteLARA%>%
   filter(Float!="NA")
 
-npropsLARA<-c("n=1","n=117","n=119","n=4","n=104", "n=0")
+npropsLARA<-c("n=1","n=119","n=1","n=119","n=4", "n=113")
 
 siteLARA$nprops <- npropsLARA
 
@@ -183,6 +189,8 @@ LARAbar1
 Float<-LARAbar1+AVGEFbar1+  plot_layout(guides = "collect")
 Float
 
+
+
 #good chi square test reference
 
 #https://lukaswallrich.github.io/GoldCoreQuants/chi-squared-tests-for-associations-between-categorical-variables.html 
@@ -195,10 +203,11 @@ chiframe<-siteAVGE%>%
 chitest<-chisq.test(chiframe[,-1])
 chitest
 
-#Pearson's Chi-squared test
+#	Pearson's Chi-squared test
 
 #data:  chiframe[, -1]
-#X-squared = 68.323, df = 2, p-value = 1.458e-15
+#X-squared = 68.152, df = 2, p-value = 1.589e-15
+
 
 #post hoc
 
@@ -208,20 +217,12 @@ chitest$expected
 
 chitest$residuals
 
-#             N         Y
-#Compass [1,]  2.712801 -3.038794
-#Steer [2,]  1.768784 -1.981335
-#Vessup [3,] -4.451244  4.986143
+#              N         Y
+#[1,]  2.616951 -2.936930
+#[2,]  1.847395 -2.073279
+#[3,] -4.461073  5.006536
 
-rownames(chiframe) <- chiframe$SiteID
 
-#looking into running chi squared post hoc test
-chiframet<-as.table(as.matrix(chiframe[,-1]))
-df<-data_frame(chiframet)
-
-#this doesn't look correct, need to look into this more
-chisq.posthoc.test(chiframet,
-                   method = "bonferroni")
 ```
 
 
@@ -291,7 +292,7 @@ LARAMkw
 #	Kruskal-Wallis rank sum test
 
 #data:  Mass by SiteID
-#Kruskal-Wallis chi-squared = 102.14, df = 2, p-value < 2.2e-16
+#Kruskal-Wallis chi-squared = 101.11, df = 2, p-value < 2.2e-16
 
 #post hoc 
 
@@ -345,7 +346,7 @@ LARALkw
 #	Kruskal-Wallis rank sum test
 
 #data:  PropaguleLength by SiteID
-#Kruskal-Wallis chi-squared = 109.1, df = 2, p-value < 2.2e-16
+#Kruskal-Wallis chi-squared = 106.92, df = 2, p-value < 2.2e-16
 
 
 #post hoc test
@@ -371,7 +372,7 @@ cldList(comparison = Lab1$Comparison,
 #Width is next!
 
 #check assumptions and try transformations
-bartlett.test(`Width-mm`~SiteID, LARA) #nope
+bartlett.test(`Width-mm`~SiteID, LARA) #yes!
 
 #no good, try transform
 LARA$WSQ<-(LARA$`Width-mm`)^2
@@ -395,7 +396,7 @@ LARAWkw
 #	Kruskal-Wallis rank sum test
 
 #data:  Width-mm by SiteID
-#Kruskal-Wallis chi-squared = 24.652, df = 2, p-value = 4.436e-06
+#Kruskal-Wallis chi-squared =  27.246, df = 2, p-value = 1.212e-06
 
 
 LARAWDunn=dunnTest(`Width-mm` ~ SiteID,
@@ -424,7 +425,7 @@ A germinans intake across sites Kruskall Wallis Test
 #check for significant differences in AVGE Mass between sites
 
 #check assumptions and try transformations
-bartlett.test(Mass~SiteID, AVGE) #p= 1.526e-05
+bartlett.test(Mass~SiteID, AVGE) #p= 1.519e-05
 
 #no good, try transform
 
@@ -451,7 +452,7 @@ AVGEMkw
 #			Kruskal-Wallis rank sum test
 
 #data:  Mass by SiteID
-#Kruskal-Wallis chi-squared = 23.689, df = 2, p-value = 7.177e-06
+#Kruskal-Wallis chi-squared = 23.163, df = 2, p-value = 9.335e-06
 
 #post hoc 
 
@@ -460,11 +461,6 @@ AVGEMDunn=dunnTest(Mass ~ SiteID,
   data = AVGE)
 
 AVGEMDunn
-#                         Comparison         Z      P.unadj        P.adj
-#1       Compass Point - STEER Basin -3.410046 6.495188e-04 1.299038e-03
-#2 Compass Point - Vessup Salt Pond  1.285312 1.986833e-01 1.986833e-01
-#3   STEER Basin - Vessup Salt Pond  4.712594 2.445836e-06 7.337509e-06
-
 
 #interpret the results of Dunn and turn into letters of significant difference
 Lab1 = AVGEMDunn$res
@@ -484,14 +480,14 @@ cldList(comparison = Lab1$Comparison,
 #compare length differences across sites
 
 #check assumptions and try transformations
-bartlett.test(PropaguleLength~SiteID, AVGE) #p=0.004767
+bartlett.test(PropaguleLength~SiteID, AVGE) #p=0.006868
 #transform
 
 AVGE$PropLentghtSQ<-(AVGE$PropaguleLength)^2
-bartlett.test(PropLentghtSQ~SiteID,AVGE)#0.0004516
+bartlett.test(PropLentghtSQ~SiteID,AVGE)# 0.0007166
 #NOPE
 AVGE$PropLengthSR<-(sqrt(AVGE$PropaguleLength))
-bartlett.test(PropLengthSR~SiteID,AVGE)#0.01157
+bartlett.test(PropLengthSR~SiteID,AVGE)# 0.01596
 #nope, nonparametric
 
 #check Residuals
@@ -500,7 +496,7 @@ ALaov<-aov(PropaguleLength~SiteID, AVGE)
 #pull Resids
 aov_residuals <- residuals(ALaov)
 hist(aov_residuals)#skewed
-shapiro.test(aov_residuals)#<-0.04565
+shapiro.test(aov_residuals)#<-0.04013
 
 #nonparametric
 AVGELkw<-kruskal.test(PropaguleLength~SiteID, data=AVGE)
@@ -509,18 +505,13 @@ AVGELkw
 #	Kruskal-Wallis rank sum test
 
 #data:  PropaguleLength by SiteID
-#Kruskal-Wallis chi-squared = 9.5222, df = 2, p-value = 0.008556
+#Kruskal-Wallis chi-squared = 9.3863, df = 2, p-value = 0.009158
 
 #post hoc
 AVGELDunn=dunnTest(PropaguleLength ~ SiteID,
   data = AVGE)
 
 AVGELDunn
-
-#                           Comparison          Z     P.unadj      P.adj
-#1        Compass Point - STEER Basin -2.926479 0.003428231 0.01028469
-#2 Compass Point - Vessup Salt Pond -0.626725 0.530839487 0.53083949
-#3   STEER Basin - Vessup Salt Pond  2.310837 0.020841839 0.04168368
 
 Lab1 = AVGELDunn$res
 
@@ -538,14 +529,14 @@ cldList(comparison = Lab1$Comparison,
 #Width is next!
 
 #check assumptions and try transformations
-bartlett.test(`Width-mm`~SiteID, AVGE) #p=0.1096
+bartlett.test(`Width-mm`~SiteID, AVGE) #p=0.09896
 
 #check residuals
 WAOV<-aov(`Width-mm`~SiteID, AVGE)
 plot(WAOV)
 
 hist(WAOV$residuals)
-shapiro.test(WAOV$residuals)#0.009995
+shapiro.test(WAOV$residuals)#0.009788
 #nonparametric
 
 AVGEWKW<-kruskal.test(`Width-mm`~SiteID, AVGE)
@@ -554,18 +545,13 @@ AVGEWKW
 #Kruskal-Wallis rank sum test
 
 #data:  Width-mm by SiteID
-#Kruskal-Wallis chi-squared = 21.249, df = 2, p-value = 2.431e-05
+#Kruskal-Wallis chi-squared = 19.69, df = 2, p-value = 5.302e-05
 
 #post hoc
 AVGEWDunn=dunnTest(`Width-mm` ~ SiteID,
   data = AVGE)
 
 AVGEWDunn
-
-#                         Comparison         Z      P.unadj        P.adj
-#1      Compass Point - STEER Basin -4.521553 6.138755e-06 1.841626e-05
-#2 Compass Point - Vessup Salt Pond -1.499867 1.336489e-01 1.336489e-01
-#3   STEER Basin - Vessup Salt Pond  3.037672 2.384133e-03 4.768267e-03
 
 Lab1 = AVGEWDunn$res
 
@@ -583,7 +569,7 @@ cldList(comparison = Lab1$Comparison,
 AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
 
 #check assumptions and try transformations
-bartlett.test(`IntakeRadicleLength-cm`~SiteID, AVGE) #p=0.3288
+bartlett.test(`IntakeRadicleLength-cm`~SiteID, AVGE) #p=0.2843
 #run ANOVA
 ARLaov<-aov(`IntakeRadicleLength-cm`~SiteID, AVGE)
 #pull Resids
@@ -609,7 +595,7 @@ AVGERadLkw
 #	Kruskal-Wallis rank sum test
 
 #data:  IntakeRadicleLength-cm by SiteID
-#Kruskal-Wallis chi-squared = 25.314, df = 2, p-value = 3.186e-06
+#Kruskal-Wallis chi-squared = 25.405, df = 2, p-value = 3.043e-06
 
 #post hoc 
 
@@ -619,10 +605,6 @@ AVGERadLDunn=dunnTest(`IntakeRadicleLength-cm` ~ SiteID,
 
 AVGERadLDunn
 
-#                          Comparison          Z      P.unadj        P.adj
-#1     Compass Point - STEER Basin  0.5710544 5.679628e-01 5.679628e-01
-#2 Compass Point - Vessup Salt Pond -4.0324866 5.518976e-05 1.103795e-04
-#3   STEER Basin - Vessup Salt Pond -4.6146095 3.938352e-06 1.181505e-05
 
 Lab1 = AVGERadLDunn$res
 
@@ -765,17 +747,17 @@ CharPlot<-(VLARAlength|VAVGElength)/(VLARAwidth|VAVGEwidth)/(VLARAmass|VAVGEmass
 
 CharPlot
 
+#exporing plot with ggsave, ensures it is always the same size, outputs into project file
 ggsave(
   filename = "IntakeCharPlot1.jpg",  # output file name
   plot = CharPlot,            # your ggplot object
-  width = 3000,                      # width in pixels?
-  height = 3200,                     # height in pixels?
+  width = 3000,                      # width in pixels
+  height = 3200,                     # height in pixels
   units = "px",                      # set units to pixels
   dpi = 300                          # resolution
 )
 
 ```
-
 
 
 Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted AVGE, ran multiple logistic regressions, best one with lowest AIC, results pasted into code (Table 4)
@@ -832,11 +814,11 @@ cor_matrix <- cor(AVGE[, c("PropaguleLength", "Width-mm", "Mass","IntakeRadicleL
 
 print(cor_matrix)
 
- #                      PropaguleLength   Width-mm        Mass IntakeRadicleLength-cm
-#PropaguleLength           1.000000e+00  0.8486919  0.86758716           2.386785e-05
-#Width-mm                  8.486919e-01  1.0000000  0.87568469          -1.311018e-01
-#Mass                      8.675872e-01  0.8756847  1.00000000          -9.210862e-02
-#IntakeRadicleLength-cm    2.386785e-05 -0.1311018 -0.09210862           1.000000e+00
+ #                        PropaguleLength   Width-mm        Mass IntakeRadicleLength-cm
+#PropaguleLength           1.0000000000  0.8457139  0.86660365          -0.0007471787
+#Width-mm                  0.8457139361  1.0000000  0.87492965          -0.1293148146
+#Mass                      0.8666036494  0.8749297  1.00000000          -0.0916776096
+#IntakeRadicleLength-cm   -0.0007471787 -0.1293148 -0.09167761           1.0000000000
 
 #L,w,m  have a strong correlation should not include all in the model, above 0.7 is highly correlated
 
@@ -848,27 +830,27 @@ print(cor_matrix)
 #start looking at just site and whether or not things float only
 BasicLogit<-glm(sprouted~SiteID+Float+Treatment, data=AVGE, family="binomial")
 summary(BasicLogit)
-#191.41
+#192
 
 #now looking to see if adding size info makes for a better model
 
 
 LengthLogit<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
 summary(LengthLogit)
-#190.24
+#190.43
 
 WidthLogit<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(WidthLogit)
-#193.38
+#193.99
 
 masslogit<-glm(sprouted~SiteID+Float+Treatment+Mass, data=AVGE, family="binomial")
 summary(masslogit)
-#193.26
+#193.81
 
 #mass, no site
 NoSMassLogit<-glm(sprouted~Float+Treatment+Mass, data=AVGE, family="binomial")
 summary(NoSMassLogit)
-#191.13
+#191.59
 
 #exclude site not significant (Best Model!)
 NoSLengthLogit<-glm(sprouted~Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
@@ -882,39 +864,39 @@ summary(NoSLengthLogit)
 
 #Coefficients:
 #                Estimate Std. Error z value Pr(>|z|)    
-#(Intercept)      -0.1461     1.2323  -0.119    0.906    
-#FloatY            0.8115     0.4381   1.852    0.064 .  
-#TreatmentFresh    6.3170     1.0612   5.953 2.64e-09 ***
-#TreatmentSalt     5.8018     0.8123   7.142 9.20e-13 ***
-#TreatmentSoil     3.5559     0.4419   8.046 8.54e-16 ***
-#PropaguleLength  -0.8842     0.5675  -1.558    0.119    
+#(Intercept)     -0.09751    1.21083  -0.081   0.9358    
+#FloatY           0.81447    0.43824   1.859   0.0631 .  
+#TreatmentFresh   6.35464    1.06185   5.984 2.17e-09 ***
+#TreatmentSalt    5.81797    0.81183   7.166 7.70e-13 ***
+#TreatmentSoil    3.56103    0.44185   8.059 7.67e-16 ***
+#PropaguleLength -0.90716    0.55774  -1.626   0.1038    
 #---
 #Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 #(Dispersion parameter for binomial family taken to be 1)
 
-#    Null deviance: 403.53  on 353  degrees of freedom
-#Residual deviance: 176.66  on 348  degrees of freedom
-#AIC: 188.66
+#    Null deviance: 405.89  on 357  degrees of freedom
+#Residual deviance: 176.85  on 352  degrees of freedom
+#AIC: 188.85
 
 #Number of Fisher Scoring iterations: 7
 
 exp(coef(NoSLengthLogit))
 
-# (Intercept)          FloatY  TreatmentFresh   TreatmentSalt   TreatmentSoil PropaguleLength 
-#      0.8641007       2.2513119     553.9290538     330.8949236      35.0189990       0.4130461 
+#    (Intercept)          FloatY  TreatmentFresh   TreatmentSalt   TreatmentSoil PropaguleLength 
+#      0.9070952       2.2579843     575.1558966     336.2878650      35.1996004       0.4036688
 
 NoSWidthLogit<-glm(sprouted~Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(NoSWidthLogit)
-#190.92
+#191.46
 
 Basic<-glm(sprouted~Treatment+SiteID, data=AVGE, family="binomial")
 summary(Basic)
-#191.39
+#191.94
 
 Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
 summary(Basic1)
-#189.53
+#189.94
 
 ```
 
@@ -928,52 +910,50 @@ NEED TO READ INTO QQ PLOT THINGS
 #treatment only
 Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
 summary(Basic1)
-#189.53
-
-#testing assumptions of bestfit model
-qqnorm(residuals(Basic1, type = "pearson"))
+#189.63
 
 #treatment&siteID
 Basic<-glm(sprouted~Treatment+SiteID, data=AVGE, family="binomial")
 summary(Basic)
-#191.39
+#191.5
 
 #Treatment/Site/Length
 TSL<-glm(sprouted~Treatment+SiteID+PropaguleLength, data=AVGE, family="binomial")
 summary(TSL)
-#191.59
+#191.71
 
 #Treatment/Site/Width
 TSW<-glm(sprouted~Treatment+SiteID+`Width-mm`, data=AVGE, family="binomial")
 summary(TSW)
-#193.12
+#193.22
 
 #Treatment/Site/Mass
 TSM<-glm(sprouted~Treatment+SiteID+Mass, data=AVGE, family="binomial")
 summary(TSM)
-#193.39
+#193.49
 
 #Treatment&Float
 Basic3<-glm(sprouted~Treatment+Float, data=AVGE, family="binomial")
 summary(Basic3)
-#189.14
+#189.23
 
 #lenght
 BasicL<-glm(sprouted~Treatment+PropaguleLength, data=AVGE, family="binomial")
 summary(BasicL)
-#190.29
+#190.39
 
 #width
 BasicW<-glm(sprouted~Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(BasicW)
-#190.88
+#190.98
 
 #mass
 BasicM<-glm(sprouted~Treatment+Mass, data=AVGE, family="binomial")
 summary(BasicM)
-#191.53
+#191.62
 
-#flaot length
+
+#float length
 #exclude site not significant (Best Model!)
 NoSLengthLogit<-glm(sprouted~Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
 summary(NoSLengthLogit)
@@ -985,23 +965,28 @@ summary(NoSLengthLogit)
 
 #Coefficients:
 #                Estimate Std. Error z value Pr(>|z|)    
-#(Intercept)      -0.1461     1.2323  -0.119    0.906    
-#FloatY            0.8115     0.4381   1.852    0.064 .  
-#TreatmentFresh    6.3170     1.0612   5.953 2.64e-09 ***
-#TreatmentSalt     5.8018     0.8123   7.142 9.20e-13 ***
-#TreatmentSoil     3.5559     0.4419   8.046 8.54e-16 ***
-#PropaguleLength  -0.8842     0.5675  -1.558    0.119    
+#(Intercept)      -0.1487     1.2331  -0.121    0.904    
+#FloatY            0.8115     0.4380   1.852    0.064 .  
+#TreatmentFresh    6.3498     1.0617   5.981 2.22e-09 ***
+#TreatmentSalt     5.8099     0.8119   7.156 8.31e-13 ***
+#TreatmentSoil     3.5559     0.4419   8.046 8.53e-16 ***
+#PropaguleLength  -0.8830     0.5679  -1.555    0.120    
 #---
 #Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 #(Dispersion parameter for binomial family taken to be 1)
 
-#    Null deviance: 403.53  on 353  degrees of freedom
-#Residual deviance: 176.66  on 348  degrees of freedom
-#AIC: 188.66
+#    Null deviance: 405.31  on 356  degrees of freedom
+#Residual deviance: 176.76  on 351  degrees of freedom
+#AIC: 188.76
 
 #Number of Fisher Scoring iterations: 7
 
+#exponentiating the coefficients of the best fit model so i can understand their effect more directly
+exp(coef(NoSLengthLogit))
+
+#   (Intercept)          FloatY  TreatmentFresh   TreatmentSalt   TreatmentSoil PropaguleLength 
+#      0.8617965       2.2511855     572.3962404     333.5957369      35.0179225       0.4135561
 
 #testing assumptions of bestfit model
 qqnorm(residuals(NoSLengthLogit, type = "pearson"))
@@ -1010,126 +995,196 @@ qqnorm(residuals(NoSLengthLogit, type = "pearson"))
 #float, width
 NoSWidthLogit<-glm(sprouted~Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(NoSWidthLogit)
-#190.92
+#191.01
 
 #flaotmass
 NoSMassLogit<-glm(sprouted~Float+Treatment+Mass, data=AVGE, family="binomial")
 summary(NoSMassLogit)
-#191.13
+#191.21
 
 #site/float
 BasicLogit<-glm(sprouted~SiteID+Float+Treatment, data=AVGE, family="binomial")
 summary(BasicLogit)
-#191.41
+#191.5
 
 #site/float/length
 
 LengthLogit<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
 summary(LengthLogit)
-#190.24
+#190.33
 
 #site/Float/width
 WidthLogit<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(WidthLogit)
-#193.38
+#193.47
 
 #site/Float/Mass
 masslogit<-glm(sprouted~SiteID+Float+Treatment+Mass, data=AVGE, family="binomial")
 summary(masslogit)
-#193.26
+#193.34
 ```
 
 
-rerunning all combinations of LARA logistic regression
+Making a figure predicting sprouting using the best model generated for AVGE
+```{r}
+#here I am creating a new dataframe to hold the predicted values, I am keeping length constant at the mean length value, so predicted values only reflect treatment and bouyancy, expand.grid creates all combos of supplied vectors (my float and treatment vectors) keeping propagule length constant at the mean
+AVGEpredict<- expand.grid(
+  Float = c("Y", "N"), #two bouyancy options
+  Treatment = c("Fresh", "Salt", "Soil", "Air"), #four treatment options
+  PropaguleLength = mean(AVGE$PropaguleLength))  # hold length constant
+
+# we are generating data for each treatment using the model created from our experimental data here, predict(mylogitmodel, newdf, type=return linear predictor log odds, not translate to probablitiles, also give SE)
+AVGEpredict1 <- predict(NoSLengthLogit, AVGEpredict, type = "link", se.fit = TRUE)
+
+#now i have the log odds for each treatment bouyancy combo and standard errors, need to convert to probabilites
+
+# Convert from log-odds to probability 𝑥x to probability 𝑝=1/(1+𝑒−𝑥)p=1/(1+e−x) for probabilites and confidence intervals (combines estimate, uncertianty (SE), and confidence level)
+AVGEpredict$prob <- plogis(AVGEpredict1$fit)  # predicted probability
+AVGEpredict$lower <- plogis(AVGEpredict1$fit - 1.96 * AVGEpredict1$se.fit)  # lower 95% CI
+AVGEpredict$upper <- plogis(AVGEpredict1$fit + 1.96 * AVGEpredict1$se.fit)  # upper 95% CI
+
+
+#plot predicted
+AVGElogitplot<-ggplot(AVGEpredict, aes(x = Treatment, y = prob, color = Float)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2,
+                position = position_dodge(width = 0.5)) +
+  ylim(0,1) +
+  labs(y = "Predicted sprouting probability",
+       x = "Treatment",
+       color = "Float")+
+  ggtitle(expression(italic("A. germinans")~"Predicted Sprouting Probability"))+
+   scale_color_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
+                    name = "Bouyancy", labels=c( "Did Not Float", "Floated"))+
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))
+
+AVGElogitplot
+
+```
+
+
+rerunning all combinations of LARA logistic regression, not including bouyancy for this one because not enough representation of sinking
 
 ```{r}
 #treatment only
 Basic1<-glm(sprouted~Treatment, data=LARA, family="binomial")
 summary(Basic1)
-#288.8
+#297.15
 
 #treatment&siteID
 Basic<-glm(sprouted~Treatment+SiteID, data=LARA, family="binomial")
 summary(Basic)
-#292.12
+#300.39
 
 #Treatment/Site/Length
 TSL<-glm(sprouted~Treatment+SiteID+PropaguleLength, data=LARA, family="binomial")
 summary(TSL)
-#289.44
+#297.62
 
 #Treatment/Site/Width
 TSW<-glm(sprouted~Treatment+SiteID+`Width-mm`, data=LARA, family="binomial")
 summary(TSW)
-#288.39
+#298.65
 
 #Treatment/Site/Mass
 TSM<-glm(sprouted~Treatment+SiteID+Mass, data=LARA, family="binomial")
 summary(TSM)
-#285.04
+#293.85
 
 #Treatment&Float
 Basic3<-glm(sprouted~Treatment+Float, data=LARA, family="binomial")
 summary(Basic3)
-#282.18
+#290.29
 
 #lenght
 BasicL<-glm(sprouted~Treatment+PropaguleLength, data=LARA, family="binomial")
 summary(BasicL)
-#190.29
+#296.49
 
 #width
 BasicW<-glm(sprouted~Treatment+`Width-mm`, data=LARA, family="binomial")
 summary(BasicW)
-# 285.5
+# 295.83
 
 #mass
 BasicM<-glm(sprouted~Treatment+Mass, data=LARA, family="binomial")
 summary(BasicM)
-#191.53
 
-#flaot length
-#exclude site not significant (Best Model!)
-NoSLengthLogit<-glm(sprouted~Float+Treatment+PropaguleLength, data=LARA, family="binomial")
-summary(NoSLengthLogit)
-#282.17
+#Call:
+#glm(formula = sprouted ~ Treatment + Mass, family = "binomial", 
+#    data = LARA)
+
+#Coefficients:
+#               Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)     -2.1058     0.6003  -3.508 0.000452 ***
+#TreatmentFresh   3.7935     0.5222   7.264 3.75e-13 ***
+#TreatmentSalt    3.6962     0.5189   7.122 1.06e-12 ***
+#TreatmentSoil    2.0476     0.3494   5.860 4.64e-09 ***
+#Mass             2.1533     0.9602   2.243 0.024924 *  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 418.92  on 358  degrees of freedom
+#Residual deviance: 283.63  on 354  degrees of freedom
+#AIC: 293.63
+
+#Number of Fisher Scoring iterations: 5
 
 
-#float, width
-NoSWidthLogit<-glm(sprouted~Float+Treatment+`Width-mm`, data=LARA, family="binomial")
-summary(NoSWidthLogit)
-#278.27
-
-#flaotmass
-NoSMassLogit<-glm(sprouted~Float+Treatment+Mass, data=LARA, family="binomial")
-summary(NoSMassLogit)
-#278.65
-
-
-#testing assumptions of bestfit model
-qqnorm(residuals(NoSMassLogit, type = "pearson"))
-
-#site/float
-BasicLogit<-glm(sprouted~SiteID+Float+Treatment, data=LARA, family="binomial")
-summary(BasicLogit)
-#285.43
-
-#site/float/length
-
-LengthLogit<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength, data=LARA, family="binomial")
-summary(LengthLogit)
-# 283.92
-
-#site/Float/width
-WidthLogit<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`, data=LARA, family="binomial")
-summary(WidthLogit)
-#280.89
-
-#site/Float/Mass
-masslogit<-glm(sprouted~SiteID+Float+Treatment+Mass, data=LARA, family="binomial")
-summary(masslogit)
-#279.14
 ```
+
+
+Now plotting the best model using predict
+
+```{r}
+
+LARA$Treatment<-as.factor(LARA$Treatment)
+
+# Mass sequence (100 points across observed range)
+mass_seq <- seq(
+  from = min(LARA$Mass),
+  to   = max(LARA$Mass),
+  length.out = 100
+)
+
+# New data for prediction
+LARApredict <- expand.grid(
+  Mass = mass_seq,
+  Treatment = levels(LARA$Treatment)
+)
+
+LARApredict$Treatment <- factor(LARApredict$Treatment, levels = levels(LARA$Treatment))
+
+
+# Predict on link scale with standard errors
+pred <- predict(BasicM, newdata = LARApredict, type = "link", se.fit = TRUE)
+
+# Add fit and SE to newdat
+LARApredict$fit <- pred$fit
+LARApredict$se <- pred$se.fit
+
+# 95% confidence interval on link scale, then back-transform to probability
+LARApredict$lower <- plogis(LARApredict$fit - 1.96 * LARApredict$se)
+LARApredict$upper <- plogis(LARApredict$fit + 1.96 * LARApredict$se)
+LARApredict$pred_prob <- plogis(LARApredict$fit)
+
+
+LARApredplot<-ggplot(LARApredict, aes(x = Mass, y = pred_prob, color = Treatment, fill = Treatment)) +
+  geom_line(linewidth =.5) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = NA) +
+  geom_point(data = LARA, aes(x = Mass, y = sprouted, color=Treatment), height = 0.03, alpha = 0.3, inherit.aes = FALSE) +
+  labs(x = "Propagule mass", y = "Predicted probability of sprouting") +
+  theme_classic()+
+  scale_fill_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
+  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))
+
+LARApredplot
+```
+
+
+
 
 To cleanup code, this doesnt currently work want to make a function to run all the logisitic regressions, then can run for all poissons/logistic regressions
 

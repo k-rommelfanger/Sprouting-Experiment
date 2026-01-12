@@ -48,6 +48,8 @@ LARA<-sprout%>%filter(Species=="LARA")
 AVGE<-sprout%>%filter(Species=="AVGE")
 
 
+
+
 #going to remove an outlier in AVGE (likely typo)
 AVGE<-AVGE%>%
   filter(PropaguleLength!=0.40)
@@ -80,6 +82,25 @@ AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
 sprout$SproutDate<-mdy(sprout$SproutDate)
 sprout$IntakeDate<-mdy(sprout$IntakeDate)
 sprout$RemovalDate<-mdy(sprout$RemovalDate)
+```
+
+Looking at the number that sprouted and number that were removed for other reasons, this includes the ones that were removed later for intake characteristics that were outliers, that is why some of the percentages are different than previously generated ones, fixed in table. NEED TO UPDATE IN METHODS THAT SOME WERE REMOVED FOR ANALYSIS BECAUSE OF BAD INTAKE DATA
+```{r}
+#we have an NA here for reason for removal, but notes show that the prop was really removed because it was moldy so going to fix
+sprout$ReasonForRemoval[is.na(sprout$ReasonForRemoval) & sprout$sprouted == 0] <- "mold"
+
+totalprops<-sprout%>%
+  group_by(Species, Treatment, ReasonForRemoval)%>%
+  summarise(N=n())%>%
+  pivot_wider(names_from = ReasonForRemoval , values_from = N )
+
+totalprops[is.na(totalprops)]<-0
+
+totalprops<-totalprops%>%
+  mutate(TotalProps=(UKN+dead+mold+`NA`+`experiment end`+lost+predation))%>%
+  mutate(LUNK=(lost+UKN))%>%
+  mutate(Pdead=dead/TotalProps, Pmold=mold/TotalProps, Psprout=`NA`/TotalProps, pend=`experiment end`/TotalProps, PPred=predation/TotalProps, PUnk=LUNK/TotalProps)%>%
+  select(Species, Treatment, LUNK)
 ```
 
 Data Cleaning, Kaplein Meyer Curve and Log Rank Test
@@ -251,7 +272,7 @@ print(LogRankLARA)
 #so we are looking at the number of samples in each treatment, the number that were observed to sprout, the number that would be expected if all treatments were the same, and the difference between observed and expected
 ```
 
-Cox Regression 
+Cox Regression (did not finish running both because looking into different analysis)
 ``` {r}
 #looking at the structure of the dataframe and reclassifying things
 str(LARA)
@@ -299,5 +320,111 @@ print(ph_test)
 AVGEcox<-coxph(Surv(time = AVGE$DaysUntilEvent, event = AVGE$sprouted)~Treatment+SiteID+Mass+Float, data=AVGE)
 
 AVGEcox
+```
+
+Look at if the number of moldy seeds are different among treatments. Doing this because my analysis above is censoring the data based on if seeds are removed because they died or are moldy. If the censoring is unequal across treatments then I might need to run a competing risk analysis
+
+```{r Checking Censoring}
+library(tidyverse)
+
+#looking at total number of props
+totalprops<-sprout%>%
+  group_by(Species, Treatment, ReasonForRemoval)%>%
+  summarise(N=n())%>%
+  pivot_wider(names_from = ReasonForRemoval , values_from = N )
+
+totalprops[is.na(totalprops)]<-0
+
+totalprops<-totalprops%>%
+  mutate(TotalProps=(UKN+dead+mold+`NA`+`experiment end`+lost+predation))%>%
+  mutate(LUNK=(lost+UKN))%>%
+  mutate(Pdead=dead/TotalProps, Pmold=mold/TotalProps, Psprout=`NA`/TotalProps, pend=`experiment end`/TotalProps, PPred=predation/TotalProps, PUnk=LUNK/TotalProps)%>%
+  select(Species, Treatment, Psprout)
+
+#looking at reasons for removal 
+unique(sprout$ReasonForRemoval)
+#[1] NA   "mold"   "dead"   "UKN"    "experiment end"  "lost"    [7] "predation"
+
+
+#alot that are NA in reason for removal, so I want to look at these looking separately at the props that sprouted and the ones that didnt
+nosproutcheck<-sprout%>%
+  filter(sprouted==1)
+
+unique(nosproutcheck$ReasonForRemoval)
+#all NAs, they were removed because they sprouted
+
+
+#now looking at the ones that did not sprout,want to check notes
+sproutcheck<-sprout%>%
+  filter(sprouted==0)
+
+unique(sproutcheck$ReasonForRemoval)
+
+#we have an NA here for reason for removal, but notes show that the prop was really removed because it was moldy so going to fix
+sprout$ReasonForRemoval[is.na(sprout$ReasonForRemoval) & sprout$sprouted == 0] <- "mold"
+
+#looking at total number removed and for what reason in each treatment
+sproutcheck<-sprout%>%
+  filter(sprouted==0)%>%
+  group_by(Species,Treatment, ReasonForRemoval)%>%
+  summarise(Number=n())%>%
+  pivot_wider(names_from = ReasonForRemoval , values_from = Number )
+
+sproutcheck[is.na(sproutcheck)]<-0
+
+sproutcheck<-sproutcheck%>%
+  mutate(TotalDead=sum(UKN+dead+mold+`experiment end`+lost))%>%
+  mutate(BeforeEnd=sum(UKN+dead+mold+lost))
+
+#these numbers are different across treatments, so I need to run a different analysis, I might need to look at this separately
+
+```
+
+
+Running Competing Risks Analysis
+
+https://psiaims.github.io/CAMIS/R/survival_cif.html 
+
+
+why competing risks analysis is necessary
+https://www.bing.com/videos/riverview/relatedvideo?q=competing+risk+analysis+in+time+to+event&mid=C047AF3DB52ABDFA9ED1C047AF3DB52ABDFA9ED1&FORM=VIRE 
+```{r}
+library(tidyverse)
+library(cmprsk)
+library(survminer)
+
+
+#setting a column that sets the status, whether the prop survived to the end 0, was pulled due to mold/predation/death 2, or sprouted 1
+
+sprout<-sprout%>%
+  mutate(status= case_when(
+    sprouted == 1 ~ 1,
+    sprouted == 0 & ReasonForRemoval != "experiment end" ~ 2,
+    sprouted == 0 & ReasonForRemoval == "experiment end" ~ 0
+  ))
+
+unique(sprout$status)
+
+LARA<-sprout%>%
+  filter(Species=="LARA")%>%
+  select(Treatment,DaysUntilEvent, status)
+
+AVGE<-sprout%>%
+  filter(Species=="AVGE")
+
+LARA$status<-as.factor(LARA$status)
+
+#run CIF
+
+LARAcif <- cuminc(Surv(DaysUntilEvent, status)~Treatment, data=LARA)
+LARAcif
+
+
+plot(cif, curvlab = names(cif), xlab = "Days", ylab = "Cumulative incidence", col = c("blue","red","green"))
+legend("bottomright", legend = c("Sprout", "Mold/Death", "Censored"), col = c("blue","red","green"), lty=1)
+```
+
+```{r}
+LARA$
 ```
 
