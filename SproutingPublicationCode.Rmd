@@ -6,6 +6,7 @@ editor_options:
   chunk_output_type: console
 ---
 
+
 ```{r Cleaning Data}
 library(readr)
 library(tidyverse)
@@ -754,7 +755,7 @@ ggsave(
 ```
 
 
-Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted AVGE, ran multiple logistic regressions, compared with AIC (Table 4) Plotting and checking correlation
+Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted AVGE, This Section was more exploratory, ran these models more systematically/organized below
 
 ```{r Logits AVGE Only}
 library(car)#for calculating VIF, test how correlation looks
@@ -820,12 +821,13 @@ print(cor_matrix)
 #https://statisticsbyjim.com/regression/multicollinearity-in-regression-analysis/
 
 
+
 ```
 
 
 
 
-Rerunning all combonations of AVGE logistic regressions
+Rerunning all combonations of AVGE logistic regressions, the reason I do this is to make sure I select the correct explanatory variables in the model, so i need to run all combinations of the non correlated variables. Then I look at the AIC value at the bottom. AIC looks at model fit and penalizes for complexity (more variables included), the model with the lower AICs are better 
 ```{r}
 #treatment only
 Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
@@ -984,7 +986,7 @@ AVGElogitplot
 ```
 
 
-rerunning all combinations of LARA logistic regression, not including bouyancy for this one because not enough representation of sinking
+rerunning all combinations of LARA logistic regression, not including bouyancy for this one because not enough representation of sinking across groups (only 6 sank)
 
 ```{r LARA logit}
 #treatment only
@@ -1057,9 +1059,9 @@ summary(BasicM)
 ```
 
 
-Now plotting the best model using predict
+Now plotting the best model using predict, these figures look different because while the best model for AVGE included lenght, bouyancy (categorical variable) had a stronger impact on the differences in sprouting, so I held length constant and had bouyancy be on the x axis, for the LARA model, we have mass (continuous variable) on the x axis 
 
-```{r}
+```{r LARA logit figure}
 library(patchwork)
 #making treatment a factor
 LARA$Treatment<-as.factor(LARA$Treatment)
@@ -1136,11 +1138,10 @@ lubesprout$DaysUntilSprout<-(lubesprout$SproutDate-lubesprout$IntakeDate)
 lubesprout<-lubesprout%>%separate(DaysUntilSprout, into = c("DaysUntilSprout","Day"), sep = " ")
 #now it no longer knows what day is, so it changes it to an NA.
 
-#one NA because no sproutdate
-lubesprout <- lubesprout[!is.na(lubesprout$DaysUntilSprout), ]
+unique(lubesprout$DaysUntilSprout)
 
-#look at propagule things to see if any affect on duration to sprouting
-#now plot the data with our factors to see if we thing there is a relationship 
+
+#Visualizing data looking for patterns to see if any obvious affect on duration to sprouting
 
 lubesprout$DaysUntilSprout<-as.numeric(lubesprout$DaysUntilSprout)
 
@@ -1214,6 +1215,10 @@ Rplot
 
 ```
 
+
+Kaidrian this is the section that I am working on rerunning, a Poisson regression is like a linear regression, but you use it on data that is not continuous. (Like if you are counting fish across several depths and want to look at the effect of depth on number of fish, you cant have 0.5 or 0.75 fish, you can only have, 1, 2,3.. fish whole numbers) Because days to sprouting are whole numbers, I thought that this would could work, thinking of days until sprouting as counts of the number of days. However there is a type of analysis called survival analysis/Kapelin Meyer Curves/cox regression and competing risks analysis/GreyFineAnalysis that is a better way to analyze this data
+
+For the final publication code I will edit this out, but I think it might be useful for you to see the thought process
 
 Look at intake characteristics effect on days until sprouting, AVGE Table 5
 ```{r AVGE Poisson}
@@ -1318,6 +1323,7 @@ summary(Mpoisson)
 
 ```
 
+This is running poissons on AVGE data here, again rerunning the survival analysis instead 
 
 effect on days until sprouting, LARA Table 7
 
@@ -1408,9 +1414,10 @@ summary(sproutpoisson2)
 ```
 
 
+this here is more poissons, in the chunks above i didnt run the models systematically enough, i missed some combinations of variables, so this was me going through and doing that before I decided to change this analysis 
+
 Rerunning all combonations of AVGE poisson regressions
 
-NEED TO READ INTO QQ PLOT THINGS
 ```{r}
 #treatment only
 Basic1<-glm(DaysUntilSprout~Treatment, data=AVGElube, family="poisson")
@@ -1643,93 +1650,7 @@ summary(masslogit)
 ```
 
 
-going to run a kaplin meyer curve analysis to analyze time until sprouting.. 
-biostatssquid is a good source to walk through this analysis
-
-The theory behind it all
-https://biostatsquid.com/survival-time-analysis-easily-explained/
-https://biostatsquid.com/kaplan-meier-curve/
-https://biostatsquid.com/easy-log-rank-test/
-https://biostatsquid.com/easy-cox-regression-for-survival-analysis/
-
-the code (how to do it)
-https://biostatsquid.com/easy-survival-analysis-r-tutorial/ 
-
-another tutorial I like the first one better https://www.sthda.com/english/wiki/survival-analysis-basics
-
-```{r Kaplin Meyer Survival Curve}
-library(survival)
-library(ggsurvfit)
-library(survminer)
-library(tidyverse)
-
-#this is me stepping through the tutorial 
-df <- survival::rotterdam
-
-#censoring status: the values in this column are 1 = event happened, 0 = censored (or TRUE and FALSE). 
-
-    #so in my case this would mean yes it sprouted, no it did not sprout
-
-
-#time to event: from the start time (e.g., time of diagnosis) to the end time (the event happened or the last day of follow-up
-
-
-df <- df %>% mutate(status = death)
-table(df$status)
-df <- df %>% mutate(dtime_yrs = dtime/365.25)
-surv_obj <- Surv(time = df$dtime_yrs, event = df$status)
-
-
-s1 <- survfit(surv_obj ~ 1, data = df)
-summary(s1)
-
-#plot 
-km_curve <- ggsurvfit(s1, linewidth = 1) +
-  labs(x = 'Years', y = 'Overall survival') +
-  add_confidence_interval() +
-  add_risktable() +
-  scale_ggsurvfit() + 
-  coord_cartesian(xlim = c(0, 8))
-
-km_curve
-
-s2 <- survfit(surv_obj ~ chemo, data = df)
-ggsurvplot(s2, data = df,
-           size = 1,
-           palette = c('#E7B800', '#2e9fdf'),
-           censor.shape = '|', censor.size = 4,
-           conf.int = TRUE,
-           pval = TRUE,
-           risk.table = TRUE,
-           risk.table.col = 'strata',
-           legend.labs = list('0' = 'No chemo', '1' = 'Chemo'),
-           risk.table.height = 0.25,
-           ggtheme = theme_bw())
-
-#log rank test
-logrankres_chemo <- survdiff(Surv(dtime_yrs, status) ~ chemo, data = df)
-logrankres_chemo
-
-logrankres_hor <- survdiff(Surv(dtime_yrs, status) ~ hormon, data = df)
-logrankres_hor
-
-
-#cox test
-cox_res <- coxph(Surv(dtime_yrs, status) ~ hormon + chemo + size + er + pgr + nodes + meno + grade + age, data = df)
-cox_res
-```
-
-Running this with my data
-
-```{r}
-
-
-
-```
-
-
-
-Cleaning data calculating proportion sprouted on each day for plotting, visualized in different ways
+Calculating proportion sprouted on each day for plotting, visualized in different ways
 ```{r Determine Percent Germinated}
 library(lubridate)
 
@@ -1754,9 +1675,13 @@ GermSproutCount<-GermSprout%>%
   group_by(Species, Treatment, SiteID,DaysUntilSprout)%>%
   summarise(sum(Day))
 
+#note can also do this by using the funciton n, it will tell you how many values in each group
+GermSproutCount1<-GermSprout%>%
+  group_by(Species, Treatment, SiteID,DaysUntilSprout)%>%
+  summarise(N=n())
+
 #change the class of the resulting object and columns
 GermSproutCount<-as.data.frame(GermSproutCount)
-
 
 #pivoting wider, have the days across the top and the number sprouted that day as values
 GermSproutCount<-GermSproutCount%>%
@@ -1805,7 +1730,6 @@ GermSproutCount<-GermSproutCount%>%
 
 #rename the dataframe so I can rewrite over the values in the columns, and after double check things to make sure worked correctly
 PropGermSproutCount<-GermSproutCount
-
 
 #this is looping through columns 4:27 (Day 1:Day 28) and adding so we know the cumulative sum of props that had sprouted on each day (if the column is column 4, we just want column four, because that is day one and there are no previous days, if it is any column after, through column 27 we want to add the value to the one before it)
 for(i in 1:nrow(PropGermSproutCount)){
@@ -1928,12 +1852,12 @@ CompassLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "Compass Point",LC)
 CompassLARAprop
 
 #STEER basin AVGE  
-SteerAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "STEER Basin", AS)
+SteerAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "STEER", AS)
 
 SteerAVGEprop
 
 #STEER basin LARA
-SteerLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "STEER Basin", LS)
+SteerLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "STEER", LS)
 
 SteerLARAprop
 
@@ -2112,8 +2036,11 @@ totalpatchplot
 
 This is running a KW test for LARA with the ones that didnt sprout removed plotting results for LARA
 ```{r FINAL KW choice LARA}
-#2) KW no sprout removed
+library(FSA)#for DunnPost Hoc
+library(rcompanion)#for cldList function
+library(ggforce)#for sina
 
+#2) KW no sprout removed
 TLARA<-GermSprout%>%
   filter(Species=="LARA")%>%
   select(SiteID, Treatment, DaysUntilSprout)
