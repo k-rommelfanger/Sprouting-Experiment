@@ -210,7 +210,7 @@ sprout<-sprout%>%
     ReasonForRemoval=="mold"~2,
     ReasonForRemoval=="predation"~3,
     ReasonForRemoval=="dead"~4,
-    ReasonForRemoval=="Not Noted"~5,
+    ReasonForRemoval=="Not Noted"~0,
     
   ))
   
@@ -300,8 +300,7 @@ cif_df <- cif_df %>%
                    "1" = "Sprouted",
                    "2" = "Mold",
                    "3" = "Predated",
-                   "4" = "Dead",
-                   "5" = "Not Noted"),
+                   "4" = "Dead"),
     treatment = factor(treatment)
   )
 

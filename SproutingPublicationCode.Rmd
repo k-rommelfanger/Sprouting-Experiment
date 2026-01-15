@@ -821,12 +821,18 @@ print(cor_matrix)
 #https://statisticsbyjim.com/regression/multicollinearity-in-regression-analysis/
 
 
+#also going to look for correlation in intake radicle length
+cor_matrix <- cor(AVGE[, c("PropaguleLength", "Width-mm", "Mass","IntakeRadicleLength-cm")], use = "complete.obs")
+
 
 ```
 
 
 
 Rerunning all combonations of AVGE logistic regressions, the reason I do this is to make sure I select the correct explanatory variables in the model, so i need to run all combinations of the non correlated variables. Then I look at the AIC value at the bottom. AIC looks at model fit and penalizes for complexity (more variables included), the model with the lower AICs are better 
+
+
+So I forgot to look at radicle lenght.. womp
 ```{r}
 #treatment only
 Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
@@ -843,36 +849,75 @@ TSL<-glm(sprouted~Treatment+SiteID+PropaguleLength, data=AVGE, family="binomial"
 summary(TSL)
 #191.71
 
+#Treatment/Site/Length/Rad
+TSLR<-TSL<-glm(sprouted~Treatment+SiteID+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSLR)
+#190.68
+
 #Treatment/Site/Width
 TSW<-glm(sprouted~Treatment+SiteID+`Width-mm`, data=AVGE, family="binomial")
 summary(TSW)
 #193.22
+
+#Treatment/Site/Width/IntakeRadicleLength
+TSWR<-TSW<-glm(sprouted~Treatment+SiteID+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSWR)
+#191.81
 
 #Treatment/Site/Mass
 TSM<-glm(sprouted~Treatment+SiteID+Mass, data=AVGE, family="binomial")
 summary(TSM)
 #193.49
 
+#Treatment/Site/Mass/Intake Radicle Length
+TSMR<-glm(sprouted~Treatment+SiteID+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSMR)
+#192.13
+
+#Treatment/Site/IntakeRadLength
+TSR<-TSM<-glm(sprouted~Treatment+SiteID+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSR)
+#190.13
+
 #Treatment&Float
 Basic3<-glm(sprouted~Treatment+Float, data=AVGE, family="binomial")
 summary(Basic3)
 #189.23
+
+#Treatment/Float/RadLength
+Basic3R<-glm(sprouted~Treatment+Float+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(Basic3R)
+#187.22
 
 #lenght
 BasicL<-glm(sprouted~Treatment+PropaguleLength, data=AVGE, family="binomial")
 summary(BasicL)
 #190.39
 
+#Treatment/Length/RadL
+BasicLR<-glm(sprouted~Treatment+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicLR)
+#189.96
+
 #width
 BasicW<-glm(sprouted~Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(BasicW)
 #190.98
+
+#width/RadL
+BasicWR<-glm(sprouted~Treatment+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicWR)
+#190.24
 
 #mass
 BasicM<-glm(sprouted~Treatment+Mass, data=AVGE, family="binomial")
 summary(BasicM)
 #191.62
 
+#mass/RadL
+BasicMR<-glm(sprouted~Treatment+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicMR)
+#190.95
 
 #float length
 #exclude site not significant (Best Model!)
@@ -913,20 +958,65 @@ exp(coef(NoSLengthLogit))
 qqnorm(residuals(NoSLengthLogit, type = "pearson"))
 
 
+#Treatment/Float/Length/RadL
+NoSLengthLogitR<-glm(sprouted~Float+Treatment+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(NoSLengthLogitR)
+
+#Call:
+#glm(formula = sprouted ~ Float + Treatment + PropaguleLength + 
+#    `IntakeRadicleLength-cm`, family = "binomial", data = AVGE)
+
+#Coefficients:
+#                         Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)              -0.06525    1.27717  -0.051   0.9593    
+#FloatY                    0.95352    0.44326   2.151   0.0315 *  
+#TreatmentFresh            6.68696    1.09681   6.097 1.08e-09 ***
+#TreatmentSalt             5.89867    0.81445   7.243 4.40e-13 ***
+#TreatmentSoil             4.03852    0.53502   7.548 4.41e-14 ***
+#PropaguleLength          -0.85591    0.58630  -1.460   0.1443    
+#`IntakeRadicleLength-cm` -1.11676    0.57981  -1.926   0.0541 .  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 405.31  on 356  degrees of freedom
+#Residual deviance: 173.05  on 350  degrees of freedom
+#AIC: 187.05
+
+#Number of Fisher Scoring iterations: 7
+
+
 #float, width
 NoSWidthLogit<-glm(sprouted~Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(NoSWidthLogit)
 #191.01
+
+#float, width, radR
+NoSWidthLogitR<-glm(sprouted~Float+Treatment+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(NoSWidthLogitR)
+#188.99
 
 #flaotmass
 NoSMassLogit<-glm(sprouted~Float+Treatment+Mass, data=AVGE, family="binomial")
 summary(NoSMassLogit)
 #191.21
 
+#Float/Mass/RadL
+NoSMassLogitR<-glm(sprouted~Float+Treatment+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(NoSMassLogitR)
+#189.21
+
 #site/float
 BasicLogit<-glm(sprouted~SiteID+Float+Treatment, data=AVGE, family="binomial")
 summary(BasicLogit)
 #191.5
+
+#site/float/RadL
+BasicLogitR<-glm(sprouted~SiteID+Float+Treatment+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicLogitR)
+#189.36
+
 
 #site/float/length
 
@@ -934,15 +1024,30 @@ LengthLogit<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength, data=AVGE, fam
 summary(LengthLogit)
 #190.33
 
+#site/float/length/radL
+LengthLogitR<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(LengthLogitR)
+#188.7
+
 #site/Float/width
 WidthLogit<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
 summary(WidthLogit)
 #193.47
 
+#site/float/width/radL
+WidthLogitR<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(WidthLogitR)
+#191.31
+
 #site/Float/Mass
 masslogit<-glm(sprouted~SiteID+Float+Treatment+Mass, data=AVGE, family="binomial")
 summary(masslogit)
 #193.34
+
+#site/float/mass/radlength
+masslogitR<-glm(sprouted~SiteID+Float+Treatment+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(masslogitR)
+#191.3
 ```
 
 
