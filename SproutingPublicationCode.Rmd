@@ -71,6 +71,7 @@ LARA<-LARA%>%
 #LARA<-LARA%>%
 #  filter(Mass<=1.66)
 
+str(LARA)
 
 #sprouted as numeric
 AVGE$sprouted<-as.numeric(AVGE$sprouted)
@@ -127,10 +128,9 @@ siteLARA <- LARA %>%
 
 
 #this is looking at the total number of AVGE props from each site that floated or not
-siteAVGE <- AVGE %>%
-  group_by( SiteID, Float) %>%
+siteAVGE <- AVGE %>% 
+  group_by(SiteID, Float) %>% 
   summarise(count = n(), .groups = "drop")
-
   
   #Visualize float or sink by site
 AVGEFbar1<-ggplot(data=siteAVGE, aes(x=SiteID, y=count, fill=Float))+
@@ -217,7 +217,6 @@ chitest$residuals
 #[2,]  1.847395 -2.073279
 #[3,] -4.461073  5.006536
 
-
 ```
 
 
@@ -263,6 +262,7 @@ library(agricolae)#Tukey post hoc test
 
 #check assumptions and try transformations
 bartlett.test(Mass~SiteID, LARA) #nope
+
 
 #no good, try transform
 
@@ -823,7 +823,6 @@ print(cor_matrix)
 
 
 ```
-
 
 
 

@@ -35,6 +35,7 @@ sprout$sprouted<-ifelse(sprout$SproutDate=="NA",'0','1')
 #made not sprouted NA instead of 0, so changing NA to 0 in sprouted column
 sprout$sprouted[is.na(sprout$sprouted)]<-0
 
+#changing how STEER is coded in the dataframe
 sprout$SiteID<-gsub("STEER Basin", "STEER", sprout$SiteID)
 
 
@@ -43,19 +44,10 @@ LARA<-sprout%>%filter(Species=="LARA")
 AVGE<-sprout%>%filter(Species=="AVGE")
 
 
-#going to remove an outlier in AVGE (likely typo)
-AVGE<-AVGE%>%
-  filter(PropaguleLength!=0.40)
-#dont think these are actually outliers, i think they were measured in cm, convert to mm
+
+#some of the widths were measured in cm, convert to mm 
 AVGE<-AVGE%>%
   mutate(`Width-mm`=if_else(`Width-mm`<7, `Width-mm`*10, `Width-mm`))
-#more outliers (likely typos too)
-#AVGE<-AVGE%>%
-#  filter(`Width-mm`!=1.3)
-#AVGE<-AVGE%>%
-#  filter(`Width-mm`!=1.5)
-#AVGE<-AVGE%>%
-#  filter(`Width-mm`!=1.7)
 
 
 
@@ -64,13 +56,6 @@ LARA<-LARA%>%
   mutate(`Width-mm`=if_else(`Width-mm`<4, `Width-mm`*10, `Width-mm`))
 #LARA<-LARA%>%
  # filter(`Width-mm`>=4)
-
-#changed my mind on this I don't think these are actually outliers leaving them in
-#LARA<-LARA%>%
-#  filter(`Width-mm`<=14)
-#LARA<-LARA%>%
-#  filter(Mass<=1.66)
-
 
 #sprouted as numeric
 AVGE$sprouted<-as.numeric(AVGE$sprouted)
@@ -83,13 +68,37 @@ AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
 #sproutdate and intake date as dates
 sprout$SproutDate<-mdy(sprout$SproutDate)
 sprout$IntakeDate<-mdy(sprout$IntakeDate)
-```
+sprout$RemovalDate<-mdy(sprout$RemovalDate)
 
 
-Looking at the number that sprouted and number that were removed for other reasons, this includes the ones that were removed later for intake characteristics that were outliers, that is why some of the percentages are different than previously generated ones, fixed in table. NEED TO UPDATE IN METHODS THAT SOME WERE REMOVED FOR ANALYSIS BECAUSE OF BAD INTAKE DATA
-```{r}
-#we have an NA here for reason for removal, but notes show that the prop was really removed because it was moldy so going to fix
-sprout$ReasonForRemoval[is.na(sprout$ReasonForRemoval) & sprout$sprouted == 0] <- "mold"
+sproutcheck<-sprout%>%
+  filter(sprouted==0)
+
+unique(sproutcheck$ReasonForRemoval)
+
+#we have an AVGE NA for reason for removal, but notes show that the prop was really removed because it was moldy so going to fix
+sprout$ReasonForRemoval[is.na(sprout$ReasonForRemoval) & sprout$sprouted == 0 & sprout$Species=="AVGE"] <- "mold"
+
+#LARA NA is from Unknown reason
+sprout$ReasonForRemoval[is.na(sprout$ReasonForRemoval) & sprout$sprouted == 0 & sprout$Species=="LARA"] <- "UKN"
+
+#there are some instances where prop is marked removed dead, but noted that it was moldy in notes column, 
+
+moldcheck<-sprout %>%
+  filter(ReasonForRemoval == "dead",
+         grepl("mold", notes, ignore.case = TRUE)) %>%
+  select(ReasonForRemoval, notes)
+
+
+#i'm going to reclassify these as moldy in reason for removal
+sprout <- sprout %>%
+  mutate(ReasonForRemoval = if_else(
+    ReasonForRemoval == "dead" &
+      grepl("mold", notes, ignore.case = TRUE),
+    "mold",
+    ReasonForRemoval
+  ))
+
 
 #this is taking sprout and organizing by species and treatment so I can see how many in each treatment were removed for each reason
 totalprops<-sprout%>%
@@ -100,16 +109,278 @@ totalprops<-sprout%>%
 #when i pivot wider, na's show up in columns with no props that were removed for that reason, make zero
 totalprops[is.na(totalprops)]<-0
 
-#calculating percentages of total props for each 
+#calculating percentages of total props in each removal/sprouting category (NA in reason for removal means sprouted)
 totalprops<-totalprops%>%
   mutate(TotalProps=(UKN+dead+mold+`NA`+`experiment end`+lost+predation))%>%
   mutate(LUNK=(lost+UKN))%>%
-  mutate(Pdead=dead/TotalProps, Pmold=mold/TotalProps, Psprout=`NA`/TotalProps, pend=`experiment end`/TotalProps, PPred=predation/TotalProps, PUnk=LUNK/TotalProps)#%>%
-  select(Species, Treatment, LUNK)
+  mutate(Pdead=dead/TotalProps, Pmold=mold/TotalProps, Psprout=`NA`/TotalProps, pend=`experiment end`/TotalProps, PPred=predation/TotalProps, PUnk=LUNK/TotalProps)%>%
+  select(Species, Treatment, dead, Pdead, mold, Pmold) #I changed out the values in this bottom line to filter for each reason for removal, to make it easier to pull the info for the tables
+
+```
+
+still want to fix the colors in this plot, later later 
+
+Stacked Barplot different removal reasons 
+```{r}
+library(patchwork)
+
+totalpropsplot<-sprout%>%
+  group_by(Species, Treatment, ReasonForRemoval)%>%
+  summarise(N=n())
+
+#combine lost and unknown reasons for removal
+totalpropsplot$ReasonForRemoval[totalpropsplot$ReasonForRemoval %in%
+                   c("UKN", "lost")] <- "Not Noted"
+
+#re-code NA as sprouted
+totalpropsplot$ReasonForRemoval[is.na(totalpropsplot$ReasonForRemoval)] <- "Sprouted"
+
+totalpropsplot$Treatment<-factor(totalpropsplot$Treatment, levels=c("Fresh", "Salt", "Soil", "Air"))
+
+totalpropsplot$ReasonForRemoval<-factor(totalpropsplot$ReasonForRemoval, levels=c("Not Noted","experiment end","dead","predation","mold","Sprouted"))
+
+removalplotLARA<-totalpropsplot%>%
+  filter(Species=="LARA")%>%
+  ggplot(aes(x=Treatment, y=N, fill=ReasonForRemoval))+
+  geom_col(position="stack")+
+  ylab("Number of Propagules")+
+  ggtitle("LARA")
+
+removalplotLARA
+
+removalplotAVGE<-totalpropsplot%>%
+  filter(Species=="AVGE")%>%
+  ggplot(aes(x=Treatment, y=N, fill=ReasonForRemoval))+
+  geom_col(position="stack")+
+  ylab("Number of Propagules")+
+  ggtitle("AVGE")
+
+removalplotAVGE
+
+removalplot<-removalplotLARA+removalplotAVGE
+removalplot
+
+```
+
+
+We see that there are different reasons that the props left the experiment, now investigating the timing on these things and their effect on sprouting using competing risks analysis 
+
+source walking through different types of survival analysis
+
+competing risks is section 9.3
+https://modernstatisticswithr.com/survivalchapter.html
+
+```{r}
+library(riskRegression)
+library(cmprsk)
+
+#look at unique values in reason for removal
+unique(sprout$ReasonForRemoval)
+
+#combine UKN and lost together
+sprout$ReasonForRemoval[sprout$ReasonForRemoval %in%
+                   c("UKN", "lost")] <- "Not Noted"
+
+#filtering to check and make sure all the NAs in Reason for removal are props that sprouted 
+sproutcheck<-sprout%>%
+  filter(is.na(ReasonForRemoval))
+
+unique(sproutcheck$sprouted)
+#only 1s, so they all sprouted
+
+#ones with NA in reason for removal are all sprouted, recoding sprouted
+sprout$ReasonForRemoval[is.na(sprout$ReasonForRemoval)] <- "Sprouted"
+
+#check
+unique(sprout$ReasonForRemoval)
+
+
+#making a fate column coding each fate of the props with a number 
+#0 = censored (still unsprouted at day 30)
+#1 = sprouted (event of interest)
+#2 = mold
+#3 = predated
+#4 = death
+#5 = lost / unknown
+
+sprout<-sprout%>%
+  mutate(Fate=case_when(
+     ReasonForRemoval=="experiment end"~0,
+    ReasonForRemoval=="Sprouted"~1,
+    ReasonForRemoval=="mold"~2,
+    ReasonForRemoval=="predation"~3,
+    ReasonForRemoval=="dead"~4,
+    ReasonForRemoval=="Not Noted"~5,
+    
+  ))
+  
+#check to make sure all fates are assigned
+unique(sprout$Fate)
+
+sprout$Treatment<-as.factor(sprout$Treatment)
+
+#make a column showing time until either sprouted or removed
+sprout<-sprout%>%
+  mutate(DaysUntilEvent=  #making a new column
+  ifelse(
+  is.na(sprout$SproutDate), #if there is an NA in sproutdate
+  RemovalDate -IntakeDate,  #then going to subtract removal date (calculates days until removal)
+  SproutDate -IntakeDate )) #if there is anything but an NA, then subtract sprout date (calculates days until sprouting)
+
+unique(sprout$DaysUntilEvent)
+
+#found a -1, found NA's, weird gonna look at these
+sproutcheck<-sprout%>%
+  filter(is.na(DaysUntilEvent)|DaysUntilEvent=="-1"|DaysUntilEvent==0)%>%
+  select(Species, Treatment, IntakeDate, SproutDate, RemovalDate,DaysUntilEvent, notes)
+
+
+#going to remove these NAs and -1, removal date isn't noted for these so they shouldnt be included in analysis
+sprout<-sprout%>%
+  filter(!is.na(DaysUntilEvent))%>%
+  filter(DaysUntilEvent!="-1")
+
+#double check they are removed
+unique(sprout$DaysUntilEvent)
+
+#now I'm checking to see if there are any remaining props without a sprout date and a removal date, there are not, but the prop being removed on day zero in the water treatment is weird, investigating more
+
+sproutcheck<-sprout%>%
+  filter(is.na(SproutDate)|is.na(RemovalDate))%>%
+  select(Treatment,Species,SproutDate, RemovalDate, notes, DaysUntilEvent)%>%
+  filter(DaysUntilEvent==0)
+
+#looks like a prop was removed but date wasn't noted, so I am also going to remove this guy from the time series analysis, ok to keep for sprout or no sprout things, only one that has day until event 0 so will remove this row (i actually figured this out because i plotted the data and saw that one had been removed early, this is why its so important to visualize your data!!)
+
+#going to remove these NAs and -1, removal date isn't noted for these so they shouldnt be included in analysis
+sprout<-sprout%>%
+  filter(DaysUntilEvent!=0)
+
+unique(sprout$DaysUntilEvent)
+
+LARAcr<-sprout%>%
+  filter(Species=="LARA")
+
+cif <- with(LARAcr, cuminc(DaysUntilEvent, Fate, group = Treatment))
+
+str(cif)
+#extract the data from one of the curves generated by CIF function
+cif[["Air 1"]]
+#shows three lists, one for time, one estimates, one variance
+
+extract_cif <- function(cif_obj, name) {
+
+  curve <- cif_obj[[name]]
+
+  # Split name into event and treatment
+  parts <- strsplit(name, " ")[[1]]
+
+  data.frame(
+    time = curve$time,
+    cif  = curve$est,
+    event = parts[2],
+    treatment = parts[1]
+  )
+}
+
+#going through to see what this is 
+cif_df <- lapply(names(cif), function(nm) {
+
+  if (nm == "Tests") return(NULL)
+
+  extract_cif(cif, nm)
+
+}) %>%
+  bind_rows()
+
+#recode events for easier labeling
+cif_df <- cif_df %>%
+  mutate(
+    event = recode(event,
+                   "1" = "Sprouted",
+                   "2" = "Mold",
+                   "3" = "Predated",
+                   "4" = "Dead",
+                   "5" = "Not Noted"),
+    treatment = factor(treatment)
+  )
+
+cifcheck<-cif_df %>%
+  group_by(event, treatment) %>%
+  filter(time == max(time))
+
+#plot
+plotchat<-ggplot(
+  cif_df %>% filter(event == "Sprouted"),
+  aes(x = time, y = cif, color = treatment)
+) +
+  geom_step(linewidth = 1.2) +
+  labs(
+    x = "Days",
+    y = "Cumulative probability of sprouting",
+    color = "Treatment"
+  ) +
+  theme_bw(base_size = 14)
+
+plotchat
+
+#repeat plots for all incedence 
+
+```
+
+Checking things make again using a different package
+```{r}
+library(tidycmprsk)
+
+str(LARAcr)
+
+LARAcr$Fate<-as.factor(LARAcr$Fate)
+cra<-cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = LARAcr)
+
+library(ggsurvfit)
+plotsprout<-ggcuminc(cra, outcome = c("1"))
+plotsprout
+
+plotmold<-ggcuminc(cra, outcome=c("2"))
+plotmold
+
+plotPredated<-ggcuminc(cra, outcome=c("3"))
+plotPredated
+
+plotDead<-ggcuminc(cra, outcome=c("4"))
+plotDead
+  
+plotNotNoted<-ggcuminc(cra, outcome=c("5"))
+plotNotNoted
+
+
+#using this package gives me the same results as what chat taught me! score!
+plottt<-plotchat+plottutorial
+plottt
+
+```
+
+
+Now running FineGrey, this looks at the effect of different explanatory varibles on our outcome we choose 
+```{r}
+#CIF for sprouting
+m1 <- crr(Surv(DaysUntilEvent, Fate) ~ Treatment + SiteID + Mass,
+         failcode = "1",
+         data = LARAcr)
+
+m1
+
+#CIF for mold
+m2<-crr(Surv(DaysUntilEvent, Fate) ~ Treatment + SiteID + Mass,
+         failcode = "2",
+         data = LARAcr)
+m2
+
+library(gtsummary)
+tbl_regression(m1, exponentiate = TRUE)
 ```
 
 Data Cleaning, Kaplein Meyer Curve and Log Rank Test
-
 
 going to run a kaplin meyer curve analysis to analyze time until sprouting.. 
 biostatssquid is a good source to walk through this analysis
@@ -125,7 +396,6 @@ https://biostatsquid.com/easy-survival-analysis-r-tutorial/
 
 another tutorial I like the first one better https://www.sthda.com/english/wiki/survival-analysis-basics
 ```{r}
-
 library(survival)
 library(ggsurvfit)
 library(survminer)
@@ -136,7 +406,7 @@ library(survminer)
 
     #this is the sprouted column that we made above, where if it sprotued 1, if       not sprotued 0
 
-#time to event: from the start time (e.g., time of diagnosis) to the end time (the event happened or the last day of follow-up
+#time to event: from the start time (experiment start) to the end time (the event happened or the last day of follow-up (end of thirty day monitoring)
 
   #to do this I am calculating the days until the props either sprouted, or were      removed
 
@@ -152,7 +422,7 @@ sprout<-sprout%>%
 unique(sprout$DaysUntilEvent)
 #found a -1, found NA's, weird gonna look at these
 sproutcheck<-sprout%>%
-  filter(is.na(DaysUntilEvent)|DaysUntilEvent=="-1")%>%
+  filter(is.na(DaysUntilEvent)|DaysUntilEvent=="-1"|DaysUntilEvent==0)%>%
   select(Species, Treatment, IntakeDate, SproutDate, RemovalDate,DaysUntilEvent, notes)
 
 
@@ -219,7 +489,7 @@ LARAplotobj
 #the ggsurvplot() function doesn't just create a plot, it creates a list of things containing the plot, in order to add ggplot layers you have to pull the plot out of the list, then you can add titles and stuff on like normal
 
 LARAplot<-LARAplotobj$plot+ #pulling out the plot from the list
-  ggtitle("LARA")+#adding ggplot things like normal
+  ggtitle(expression(italic("L. racemosa")))+#adding ggplot things like normal
   theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5))
 LARAplot
 
@@ -232,7 +502,7 @@ AVGEplotobj
 
 #same thing for AVGE
 AVGEplot<-AVGEplotobj$plot+ #pulling out the plot from the list
-  ggtitle("AVGE")+#adding ggplot things like normal
+  ggtitle(expression(italic("A. germinans")))+#adding ggplot things like normal
   theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5))
 AVGEplot
 
@@ -276,6 +546,7 @@ print(LogRankLARA)
 
 #so we are looking at the number of samples in each treatment, the number that were observed to sprout, the number that would be expected if all treatments were the same, and the difference between observed and expected
 ```
+
 
 Cox Regression (did not finish running both because looking into different analysis)
 ``` {r}
@@ -429,7 +700,5 @@ plot(cif, curvlab = names(cif), xlab = "Days", ylab = "Cumulative incidence", co
 legend("bottomright", legend = c("Sprout", "Mold/Death", "Censored"), col = c("blue","red","green"), lty=1)
 ```
 
-```{r}
-LARA$
-```
+
 
