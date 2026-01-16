@@ -614,7 +614,6 @@ cldList(comparison = Lab1$Comparison,
 
 ```
 
-
 Visualize size differences by species and collection site
 
 Visualizing propagule characteristics determining differences between sites, showing outputs of kw tests Figure4/5
@@ -1082,7 +1081,7 @@ AVGElogitplot<-ggplot(AVGEpredict, aes(x = Treatment, y = prob, color = Float)) 
        color = "Float")+
   ggtitle(expression(italic("A. germinans")~"Predicted Sprouting Probability"))+
    scale_color_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
-                    name = "Bouyancy", labels=c( "Did Not Float", "Floated"))+
+                    name = "Bouyancy", labels=c( "Floated", "Did Not Float"))+
   theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))
 
 AVGElogitplot

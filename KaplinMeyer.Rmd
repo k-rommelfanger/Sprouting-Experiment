@@ -130,21 +130,22 @@ totalpropsplot<-sprout%>%
 
 #combine lost and unknown reasons for removal
 totalpropsplot$ReasonForRemoval[totalpropsplot$ReasonForRemoval %in%
-                   c("UKN", "lost")] <- "Not Noted"
+                   c("UKN", "lost")] <- "Censored"
 
 #re-code NA as sprouted
 totalpropsplot$ReasonForRemoval[is.na(totalpropsplot$ReasonForRemoval)] <- "Sprouted"
 
 totalpropsplot$Treatment<-factor(totalpropsplot$Treatment, levels=c("Fresh", "Salt", "Soil", "Air"))
 
-totalpropsplot$ReasonForRemoval<-factor(totalpropsplot$ReasonForRemoval, levels=c("Not Noted","experiment end","dead","predation","mold","Sprouted"))
+totalpropsplot$ReasonForRemoval<-factor(totalpropsplot$ReasonForRemoval, levels=c("Censored","experiment end","dead","predation","mold","Sprouted"))
 
 removalplotLARA<-totalpropsplot%>%
   filter(Species=="LARA")%>%
   ggplot(aes(x=Treatment, y=N, fill=ReasonForRemoval))+
   geom_col(position="stack")+
   ylab("Number of Propagules")+
-  ggtitle("LARA")
+  ggtitle("LARA")+
+  scale_fill_manual(values=c("Censored"="#001400","experiment end"="#228B22", "dead"="#355E3B","predation"="olivedrab","mold"="#808000","Sprouted"="darkgreen"), labels=c("Censored"="Censored","experiment end"="Experiment End", "dead"="Dead","predation"="Predation","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
 
 removalplotLARA
 
@@ -153,7 +154,22 @@ removalplotAVGE<-totalpropsplot%>%
   ggplot(aes(x=Treatment, y=N, fill=ReasonForRemoval))+
   geom_col(position="stack")+
   ylab("Number of Propagules")+
-  ggtitle("AVGE")
+  ggtitle(expression(italic("A. germinans")))+
+  theme()+
+  scale_fill_manual(values=c("Censored"="#001400","dead"="coral4","mold"="darkolivegreen1","Sprouted"="#228B22"), labels=c("Censored"="Censored", "dead"="Dead","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
+  
+
+"#738F52"
+"#228B22"
+"#889682"
+"#355E3B"
+"#808000"
+"#93C572"
+"#009E60"
+"#40826D"
+"darkgreen"
+"salmon4"
+"olivedrab"
 
 removalplotAVGE
 
@@ -262,7 +278,7 @@ unique(sprout$DaysUntilEvent)
 
 LARAcr<-sprout%>%
   filter(Species=="LARA")
-
+#need to turn off tidycmprsk for this to run
 cif <- with(LARAcr, cuminc(DaysUntilEvent, Fate, group = Treatment))
 
 str(cif)
@@ -332,13 +348,14 @@ plotchat
 Checking things make again using a different package
 ```{r}
 library(tidycmprsk)
+library(ggsurvfit)
 #this package interacts badly with cmprsk, need to turn this off in order to run one from this package
 str(LARAcr)
 
 LARAcr$Fate<-as.factor(LARAcr$Fate)
 cra<-cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = LARAcr)
 
-library(ggsurvfit)
+
 plotsprout<-ggcuminc(cra, outcome = c("1"))
 plotsprout
 
@@ -353,7 +370,7 @@ plotDead
   
 
 #using this package gives me the same results as what chat taught me! score!
-plottt<-plotchat+plottutorial
+plottt<-plotchat+plotsprout
 plottt
 
 ```
@@ -362,20 +379,39 @@ plottt
 Now running FineGrey for LARA, this looks at the effect of different explanatory varibles on our outcome we choose 
 ```{r}
 #CIF for sprouting
-m1 <- crr(Surv(DaysUntilEvent, Fate) ~ Treatment + SiteID + Mass,
+m1 <- crr(Surv(DaysUntilEvent, Fate) ~ Treatment + Mass,
          failcode = "1",
          data = LARAcr)
 
 m1
 
+#Variable         Coef    SE      HR     95% CI       p-value    
+#TreatmentFresh   2.23    0.241   9.32   5.81, 14.9   <0.001     
+#TreatmentSalt    1.83    0.232   6.24   3.96, 9.82   <0.001     
+#TreatmentSoil    1.24    0.235   3.46   2.18, 5.48   <0.001     
+#Mass             0.556   0.277   1.74   1.01, 3.00   0.045  
+
+
+
+
 #CIF for mold
-m2<-crr(Surv(DaysUntilEvent, Fate) ~ Treatment + SiteID + Mass,
+m2<-crr(Surv(DaysUntilEvent, Fate) ~ Treatment + Mass,
          failcode = "2",
          data = LARAcr)
 m2
 
+#Variable         Coef    SE      HR     95% CI       p-value    
+#TreatmentFresh   -12.9   0.243   0.00   0.00, 0.00   <0.001     
+#TreatmentSalt    -12.9   0.255   0.00   0.00, 0.00   <0.001     
+#TreatmentSoil    -1.56   0.488   0.21   0.08, 0.55   0.001      
+#Mass             0.867   0.923   2.38   0.39, 14.5   0.35 
+
+
+#this is a way to export the data directly from r into a table might investigate this more later!
 library(gtsummary)
 tbl_regression(m1, exponentiate = TRUE)
+
+
 ```
 
 Plotting and Running for AVGE
@@ -387,12 +423,23 @@ library(ggsurvfit)
 AVGEcr<-sprout%>%
   filter(Species=="AVGE")
 
+unique(AVGEcr$DaysUntilEvent)
+unique(AVGEcr$Treatment)
+unique(AVGEcr$Fate)
+
 AVGEcr$Fate<-as.factor(AVGEcr$Fate)
 Acra<-cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = AVGEcr)
 #getting warning message need to investigate!
 
 plotsprout<-ggcuminc(Acra, outcome = c("1"))
 plotsprout
+
+#getting a warning, removed 14 rows containint missing values or balues outside scale range need to investigate 
+View(plotsprout$data)
+#looking at the data I can see that we reach 100% sprouting before the end of the time interval so there are NAs later in the timesteps this is what was removed
+
+
+
 
 plotmold<-ggcuminc(cra, outcome=c("2"))
 plotmold
