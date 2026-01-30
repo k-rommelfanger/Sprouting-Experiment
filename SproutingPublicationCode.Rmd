@@ -220,7 +220,7 @@ chitest$residuals
 ```
 
 
-Calculating mean and sem of intake characteristics (MEAN/SEM Intake Variables Table X)
+Calculating mean and sem of intake characteristics (MEAN/SEM Intake Variables Table 2)
 
 ```{r Mean and St Dev}
 
@@ -756,7 +756,7 @@ ggsave(
 
 Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted AVGE, This Section was more exploratory, ran these models more systematically/organized below
 
-```{r Logits AVGE Only}
+#```{r Logits AVGE Only}
 library(car)#for calculating VIF, test how correlation looks
 library(DHARMa)#for simulate residuals, to check assumptions
 library(patchwork)
@@ -824,14 +824,12 @@ print(cor_matrix)
 cor_matrix <- cor(AVGE[, c("PropaguleLength", "Width-mm", "Mass","IntakeRadicleLength-cm")], use = "complete.obs")
 
 
-```
+#```
 
 
+Running all combonations of AVGE logistic regressions, the reason I do this is to make sure I select the correct explanatory variables in the model, so i need to run all combinations of the non correlated variables. Then I look at the AIC value at the bottom. AIC looks at model fit and penalizes for complexity (more variables included), the model with the lower AICs are better 
 
-Rerunning all combonations of AVGE logistic regressions, the reason I do this is to make sure I select the correct explanatory variables in the model, so i need to run all combinations of the non correlated variables. Then I look at the AIC value at the bottom. AIC looks at model fit and penalizes for complexity (more variables included), the model with the lower AICs are better 
 
-
-So I forgot to look at radicle lenght.. womp
 ```{r}
 #treatment only
 Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
@@ -985,6 +983,38 @@ summary(NoSLengthLogitR)
 
 #Number of Fisher Scoring iterations: 7
 
+#exponentiating the coefficients of the best fit model so i can understand their effect more directly
+exp(coef(NoSLengthLogitR))
+
+ #        (Intercept)                   FloatY           TreatmentFresh            TreatmentSalt 
+#               0.9368332                2.5948145              801.8810915              364.5513044 
+#           TreatmentSoil          PropaguleLength `IntakeRadicleLength-cm` 
+#              56.7421217                0.4248974                0.3273375 
+
+#pull coefficients so I can calculated 95% CI
+coef<-coef(NoSLengthLogitR)
+
+#pull out the standard error so i can caluculate 95% confidence interval
+se   <- summary(NoSLengthLogitR)$coefficients[, "Std. Error"]
+
+#calculate lower and upper CI
+LCL <- exp(coef - 1.96 * se)
+LCL
+#            (Intercept)                   FloatY           TreatmentFresh 
+#              0.07665016               1.08841885              93.43039728 
+#           TreatmentSalt            TreatmentSoil          PropaguleLength 
+ #            73.87284548              19.88314317               0.13465392 
+#`IntakeRadicleLength-cm` 
+#              0.10506264 
+UCL <- exp(coef + 1.96 * se)
+UCL
+#(Intercept)                   FloatY           TreatmentFresh 
+#               11.450156                 6.186095              6882.270691 
+#           TreatmentSalt            TreatmentSoil          PropaguleLength 
+#             1799.005476               161.929547                 1.340754
+#`IntakeRadicleLength-cm` 
+#                1.019866 
+
 
 #float, width
 NoSWidthLogit<-glm(sprouted~Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
@@ -1050,17 +1080,20 @@ summary(masslogitR)
 ```
 
 
+Visualized AVGE in two ways one just holding radL and L constant and generating results for float and not float, the other varying intake RL across observed values
+
 Making a figure predicting sprouting using the best model generated for AVGE
 ```{r AVGE logit Figure}
-#here I am creating a new dataframe to hold the predicted values, I am keeping length constant at the mean length value, so predicted values only reflect treatment and buoyancy, expand.grid creates all combos of supplied vectors (my float and treatment vectors) keeping propagule length constant at the mean
+#here I am creating a new dataframe to hold the predicted values, I am keeping length constant at the mean length value, and radicle length constant also, so predicted values only reflect treatment and buoyancy, expand.grid creates all combos of supplied vectors (my float and treatment vectors) keeping propagule and radicle length constant at the mean
 AVGEpredict<- expand.grid(
   Float = c("Y", "N"), #two bouyancy options
   Treatment = c("Fresh", "Salt", "Soil", "Air"), #four treatment options
-  PropaguleLength = mean(AVGE$PropaguleLength))  # hold length constant
+  PropaguleLength = mean(AVGE$PropaguleLength),
+  `IntakeRadicleLength-cm`   = mean(AVGE$`IntakeRadicleLength-cm`))  # hold length constant
 
 
 # we are generating data for each treatment using the model created from our experimental data here, predict(mylogitmodel, newdf, type=return linear predictor log odds, not translate to probablitiles, also give SE)
-AVGEpredict1 <- predict(NoSLengthLogit, AVGEpredict, type = "link", se.fit = TRUE)
+AVGEpredict1 <- predict(NoSLengthLogitR, AVGEpredict, type = "link", se.fit = TRUE)
 
 #now i have the log odds for each treatment bouyancy combo and standard errors, need to convert to probabilites
 
@@ -1075,7 +1108,7 @@ AVGElogitplot<-ggplot(AVGEpredict, aes(x = Treatment, y = prob, color = Float)) 
   geom_point(position = position_dodge(width = 0.5), size = 3) +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2,
                 position = position_dodge(width = 0.5)) +
-  ylim(0,1) +
+  coord_cartesian(ylim = c(0,1)) +
   labs(y = "Predicted sprouting probability",
        x = "Treatment",
        color = "Float")+
@@ -1087,6 +1120,76 @@ AVGElogitplot<-ggplot(AVGEpredict, aes(x = Treatment, y = prob, color = Float)) 
 AVGElogitplot
 
 ```
+
+want to visualize with range of values of intake radicle length and see which I like better
+
+```{r}
+
+AVGEpredictRad<- expand.grid(
+  Float = c("Y", "N"), #two bouyancy options
+  Treatment = c("Fresh", "Salt", "Soil", "Air"), #four treatment options
+  PropaguleLength = mean(AVGE$PropaguleLength), #hold length constant
+  `IntakeRadicleLength-cm`   = seq(min(AVGE$`IntakeRadicleLength-cm`),
+               max(AVGE$`IntakeRadicleLength-cm`),
+               length.out = 100))  # radicle lenght across values
+
+# we are generating data for each treatment using the model created from our experimental data here, predict(mylogitmodel, newdf, type=return linear predictor log odds, not translate to probablitiles, also give SE)
+AVGEpredictRad1 <- predict(NoSLengthLogitR, AVGEpredictRad, type = "link", se.fit = TRUE)
+
+AVGEpredictRad$prob <- plogis(AVGEpredictRad1$fit)  # predicted probability
+AVGEpredictRad$lower <- plogis(AVGEpredictRad1$fit - 1.96 * AVGEpredictRad1$se.fit)  # lower 95% CI
+AVGEpredictRad$upper <- plogis(AVGEpredictRad1$fit + 1.96 * AVGEpredictRad1$se.fit)  # upper 95% CI
+
+
+
+AVGEpredplot<-ggplot(AVGEpredictRad, aes(x = `IntakeRadicleLength-cm`, y = prob, color = Treatment, fill = Treatment)) +
+  geom_line(linewidth =.5) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = NA) +
+  geom_point(data = AVGE, aes(x = `IntakeRadicleLength-cm` , y = sprouted, color=Treatment), height = 0.03, alpha = 0.3, inherit.aes = FALSE) +
+  labs(x = "Propagule Radicle Length at Intake", y = "Predicted probability of sprouting") +
+  ggtitle(expression(italic("A. germinans")~"Predicted Sprouting Probability"))+
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
+  scale_fill_manual(name="Treatment",values=c("cornflowerblue","darkblue","salmon4","azure4"))+
+  scale_color_manual(name="Treatment",values=c("cornflowerblue","darkblue","salmon4","azure4"))+
+  facet_wrap(~ Float, 
+             labeller = labeller(
+               Float = c(
+                 "Y" = "Floated",
+                 "N" = "Did Not Float"
+               )
+             ))
+
+AVGEpredplot
+
+
+AVGEpredplot <- ggplot(
+  AVGEpredictRad,
+  aes(x = `IntakeRadicleLength-cm`,
+      y = prob,
+      color = Treatment,
+      fill = Treatment,
+      group = Treatment)
+) +
+  geom_ribbon(aes(ymin = lower, ymax = upper),
+              alpha = 0.2,
+              color = NA) +
+  geom_line(linewidth = 0.8) +
+  labs(
+    x = "Initial radicle length (cm)",
+    y = "Predicted probability of sprouting",
+    title = expression(italic("A. germinans") ~ "Predicted Sprouting Probability")
+  ) +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_fill_manual(
+    values = c("azure4", "cornflowerblue", "darkblue", "salmon4")
+  ) +
+  scale_color_manual(
+    values = c("azure4", "cornflowerblue", "darkblue", "salmon4")
+  ) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
 
 
 rerunning all combinations of LARA logistic regression, not including bouyancy for this one because not enough representation of sinking across groups (only 6 sank)
@@ -1115,7 +1218,99 @@ summary(TSW)
 #Treatment/Site/Mass
 TSM<-glm(sprouted~Treatment+SiteID+Mass, data=LARA, family="binomial")
 summary(TSM)
-#293.85
+
+#Call:
+#glm(formula = sprouted ~ Treatment + SiteID + Mass, family = "binomial", 
+#    data = LARA)
+
+#Coefficients:
+#                       Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)             -3.0511     0.8323  -3.666 0.000247 ***
+#TreatmentFresh           3.8565     0.5289   7.292 3.06e-13 ***
+#TreatmentSalt            3.6908     0.5207   7.088 1.36e-12 ***
+#TreatmentSoil            2.1294     0.3574   5.959 2.54e-09 ***
+#SiteIDSTEER              0.8123     0.4289   1.894 0.058257 .  
+#SiteIDVessup Salt Pond   0.3442     0.3985   0.864 0.387631    
+#Mass                     3.1388     1.1283   2.782 0.005403 ** 
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 418.92  on 358  degrees of freedom
+#Residual deviance: 279.85  on 352  degrees of freedom
+#AIC: 293.85
+
+#Number of Fisher Scoring iterations: 5
+
+
+#going to check with interaction between mass and site, want to double check there is enough replication for an interaction term
+
+
+#pull coefficients so I can calculated 95% CI
+coef<-coef(TSM)
+
+exp(coef(TSM))
+#    (Intercept)         TreatmentFresh          TreatmentSalt 
+#            0.04730836            47.29806010            40.07781792 
+#         TreatmentSoil            SiteIDSTEER SiteIDVessup Salt Pond 
+#            8.40998224             2.25312227             1.41091922 
+#                  Mass 
+#           23.07524820 
+
+#pull out the standard error so i can caluculate 95% confidence interval
+se   <- summary(TSM)$coefficients[, "Std. Error"]
+
+#calculate lower and upper CI
+LCL <- exp(coef - 1.96 * se)
+LCL
+#  (Intercept)         TreatmentFresh          TreatmentSalt 
+#           0.009256446           16.774622485           14.444003898 
+#         TreatmentSoil            SiteIDSTEER SiteIDVessup Salt Pond 
+#           4.174501747            0.971986623            0.646134121 
+#                  Mass 
+#           2.527881415 
+UCL <- exp(coef + 1.96 * se)
+UCL
+#(Intercept)         TreatmentFresh          TreatmentSalt 
+#             0.2417862            133.3625536            111.2040332 
+#         TreatmentSoil            SiteIDSTEER SiteIDVessup Salt Pond 
+#            16.9428127              5.2228702              3.0809285 
+#                  Mass 
+#           210.6376811
+
+
+LARAcheck<-LARA%>%
+  group_by(SiteID, Treatment)%>%
+  summarise(N=n())
+
+TSMI<-glm(sprouted~Treatment+SiteID+Mass+SiteID*Mass, data=LARA, family="binomial")
+summary(TSMI)
+
+#Call:
+#glm(formula = sprouted ~ Treatment + SiteID + Mass + SiteID *Mass, family = "binomial", data = LARA)
+
+#Coefficients:
+#                            Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)                  -2.2935     1.0273  -2.233   0.0256 *  
+#TreatmentFresh                3.9112     0.5372   7.280 3.33e-13 ***
+#TreatmentSalt                 3.7692     0.5254   7.173 7.32e-13 ***
+#TreatmentSoil                 2.1548     0.3587   6.007 1.89e-09 ***
+#SiteIDSTEER                   1.0305     1.7026   0.605   0.5450    
+#SiteIDVessup Salt Pond       -1.5905     1.3227  -1.202   0.2292    
+#Mass                          1.9162     1.4682   1.305   0.1918    
+#SiteIDSTEER:Mass             -0.9732     3.3305  -0.292   0.7701    
+#SiteIDVessup Salt Pond:Mass   3.5699     2.2929   1.557   0.1195    
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 418.92  on 358  degrees of freedom
+#Residual deviance: 276.90  on 350  degrees of freedom
+#AIC: 294.9
+
+#Number of Fisher Scoring iterations: 5
 
 #Treatment&Float
 Basic3<-glm(sprouted~Treatment+Float, data=LARA, family="binomial")
@@ -1169,25 +1364,16 @@ library(patchwork)
 #making treatment a factor
 LARA$Treatment<-as.factor(LARA$Treatment)
 
-# Mass sequence (generating 100 evenly spaced mass points across observed range from data)
-mass_seq <- seq(
-  from = min(LARA$Mass),
-  to   = max(LARA$Mass),
-  length.out = 100
-)
-
-# Makes it so each mass value has a corresponding place for each of the four levels of treatment in my LARA df
-LARApredict <- expand.grid(
-  Mass = mass_seq,
-  Treatment = levels(LARA$Treatment)
-)
-
-#treatment is a factor, same as when model was fitted
-LARApredict$Treatment <- factor(LARApredict$Treatment, levels = levels(LARA$Treatment))
+LARApredict<- expand.grid(
+  Treatment = c("Fresh", "Salt", "Soil", "Air"),#four treatment options
+  SiteID= c("Vessup Salt Pond", "STEER", "Compass Point"),
+  Mass = seq(min(AVGE$`IntakeRadicleLength-cm`),
+               max(AVGE$`IntakeRadicleLength-cm`),
+               length.out = 100))  # radicle lenght across values
 
 
 # Predict values using my model, on link scale with standard errors calculated for each value
-pred <- predict(BasicM, newdata = LARApredict, type = "link", se.fit = TRUE)
+pred <- predict(TSM, newdata = LARApredict, type = "link", se.fit = TRUE)
 
 # Add fit and SE generated by predict to LARApredict df
 LARApredict$fit <- pred$fit
@@ -1206,8 +1392,9 @@ LARApredplot<-ggplot(LARApredict, aes(x = Mass, y = pred_prob, color = Treatment
   labs(x = "Propagule mass", y = "Predicted probability of sprouting") +
   ggtitle(expression(italic("L. racesmosa")~"Predicted Sprouting Probability"))+
   theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
-  scale_fill_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
-  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))
+  scale_fill_manual(name="Treatment",values=c("cornflowerblue","darkblue","salmon4","azure4"))+
+  scale_color_manual(name="Treatment",values=c("cornflowerblue","darkblue","salmon4","azure4"))+
+  facet_wrap(~SiteID)
 
 LARApredplot
 
@@ -1227,6 +1414,48 @@ ggsave(
 )
 ```
 
+What does it look like if i hold mass constant and have site and treatment?
+
+```{r}
+
+LARApredict1<- expand.grid(
+  Treatment = c("Fresh", "Salt", "Soil", "Air"),#four treatment options
+  SiteID= c("Vessup Salt Pond", "STEER", "Compass Point"),
+  Mass = mean(LARA$Mass))  #mass across values
+
+# Predict values using my model, on link scale with standard errors calculated for each value
+pred <- predict(TSM, newdata = LARApredict1, type = "link", se.fit = TRUE)
+
+# Add fit and SE generated by predict to LARApredict df
+LARApredict1$fit <- pred$fit
+LARApredict1$se <- pred$se.fit
+
+# these were calculated on the log scale, which is how results are presented in logit, converting to probability scale (using plogis) for plotting both predicted values and 95% (1.96)confidence intervals
+LARApredict1$lower <- plogis(LARApredict1$fit - 1.96 * LARApredict1$se)
+LARApredict1$upper <- plogis(LARApredict1$fit + 1.96 * LARApredict1$se)
+LARApredict1$pred_prob <- plogis(LARApredict1$fit)
+
+
+LARAlogitplot<-ggplot(LARApredict1, aes(x = Treatment, y = pred_prob, color = SiteID)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2,
+                position = position_dodge(width = 0.5)) +
+  coord_cartesian(ylim = c(0,1)) +
+  labs(y = "Predicted sprouting probability",
+       x = "Treatment",
+       color = "SiteID")+
+  ggtitle(expression(italic("L. racemosa")~"Predicted Sprouting Probability"))+
+   scale_color_manual(values = c("Vessup Salt Pond" = "olivedrab", "STEER" = "salmon4","Compass Point"="darkgreen"),
+                    name = "Site ID", labels=c( "Vessup Salt Pond", "STEER","Compass Point"))+
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))
+   
+   LARAlogitplot
+
+```
+
+
+
+
 Calculate days until sprouting visualize prop characterisics vs time until sprout to see if it looks like any prop characteristics have any effect on time until sprout!
 
 ```{r Calculate days until sprout and plot AVGE}
@@ -1242,6 +1471,21 @@ lubesprout<-lubesprout%>%separate(DaysUntilSprout, into = c("DaysUntilSprout","D
 #now it no longer knows what day is, so it changes it to an NA.
 
 unique(lubesprout$DaysUntilSprout)
+
+#days until sprout as numeric
+lubesprout$DaysUntilSprout<-as.numeric(lubesprout$DaysUntilSprout)
+
+lubesprout<-lubesprout%>%
+  filter(DaysUntilSprout!="NA")
+
+unique(lubesprout$DaysUntilSprout)
+
+#calculate average days until sprouting by treatment
+lubecheck<-lubesprout%>%
+  group_by(Species, Treatment)%>%
+  summarise(mean=mean(DaysUntilSprout))
+
+
 
 
 #Visualizing data looking for patterns to see if any obvious affect on duration to sprouting

@@ -43,19 +43,13 @@ sprout$SiteID<-gsub("STEER Basin", "STEER", sprout$SiteID)
 LARA<-sprout%>%filter(Species=="LARA")
 AVGE<-sprout%>%filter(Species=="AVGE")
 
-
-
 #some of the widths were measured in cm, convert to mm 
 AVGE<-AVGE%>%
   mutate(`Width-mm`=if_else(`Width-mm`<7, `Width-mm`*10, `Width-mm`))
 
-
-
-# i think these were likely accidentally measured in cm, going to convert to mm
+# i think these were likely accidentally measured in cm, going to convert to 
 LARA<-LARA%>%
   mutate(`Width-mm`=if_else(`Width-mm`<4, `Width-mm`*10, `Width-mm`))
-#LARA<-LARA%>%
- # filter(`Width-mm`>=4)
 
 #sprouted as numeric
 AVGE$sprouted<-as.numeric(AVGE$sprouted)
@@ -123,6 +117,7 @@ still want to fix the colors in this plot, later later
 Stacked Barplot different removal reasons 
 ```{r}
 library(patchwork)
+library(colorBlindness)
 
 totalpropsplot<-sprout%>%
   group_by(Species, Treatment, ReasonForRemoval)%>%
@@ -145,7 +140,7 @@ removalplotLARA<-totalpropsplot%>%
   geom_col(position="stack")+
   ylab("Number of Propagules")+
   ggtitle("LARA")+
-  scale_fill_manual(values=c("Censored"="#001400","experiment end"="#228B22", "dead"="#355E3B","predation"="olivedrab","mold"="#808000","Sprouted"="darkgreen"), labels=c("Censored"="Censored","experiment end"="Experiment End", "dead"="Dead","predation"="Predation","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
+  scale_fill_manual(values=c("Censored"="#001400","experiment end"="#40826D", "dead"="salmon4","predation"="olivedrab","mold"="darkolivegreen1","Sprouted"="#355E3B"), labels=c("Censored"="Censored","experiment end"="Experiment End", "dead"="Dead","predation"="Predation","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
 
 removalplotLARA
 
@@ -156,7 +151,7 @@ removalplotAVGE<-totalpropsplot%>%
   ylab("Number of Propagules")+
   ggtitle(expression(italic("A. germinans")))+
   theme()+
-  scale_fill_manual(values=c("Censored"="#001400","dead"="coral4","mold"="darkolivegreen1","Sprouted"="#228B22"), labels=c("Censored"="Censored", "dead"="Dead","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
+  scale_fill_manual(values=c("Censored"="#001400","dead"="salmon4","mold"="darkolivegreen1","Sprouted"="#355E3B"), labels=c("Censored"="Censored", "dead"="Dead","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
   
 
 "#738F52"
@@ -170,21 +165,32 @@ removalplotAVGE<-totalpropsplot%>%
 "darkgreen"
 "salmon4"
 "olivedrab"
+"burlywood4"
 
 removalplotAVGE
 
 removalplot<-removalplotLARA+removalplotAVGE
 removalplot
 
+cvdPlot(removalplot)
+
 ```
 
 
 We see that there are different reasons that the props left the experiment, now investigating the timing on these things and their effect on sprouting using competing risks analysis 
 
-source walking through different types of survival analysis
+source walking through different types of survival analysis (r tutorial)
 
 competing risks is section 9.3
 https://modernstatisticswithr.com/survivalchapter.html
+
+Paper explaining how to interpret the results
+
+Austin, P. C., & Fine, J. P. (2017). Practical recommendations for reporting F ine‐G ray model analyses for competing risk data. Statistics in medicine, 36(27), 4391-4400.
+
+
+#another source for competing risks 
+https://www.publichealth.columbia.edu/research/population-health-methods/competing-risk-analysis?utm_source=chatgpt.com 
 
 ```{r}
 library(riskRegression)
@@ -268,7 +274,7 @@ sproutcheck<-sprout%>%
 
 #looks like a prop was removed but date wasn't noted, so I am also going to remove this guy from the time series analysis, ok to keep for sprout or no sprout things, only one that has day until event 0 so will remove this row (i actually figured this out because i plotted the data and saw that one had been removed early, this is why its so important to visualize your data!!)
 
-#going to remove these NAs and -1, removal date isn't noted for these so they shouldnt be included in analysis
+#going to remove these NAs and -1, removal date isn't noted for these so they shouldn't be included in analysis
 sprout<-sprout%>%
   filter(DaysUntilEvent!=0)
 
@@ -356,11 +362,23 @@ LARAcr$Fate<-as.factor(LARAcr$Fate)
 cra<-cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = LARAcr)
 
 
-plotsprout<-ggcuminc(cra, outcome = c("1"))
+plotsprout<-ggcuminc(cra, outcome = c("1"))+
+  add_confidence_interval(color=NA)+
+  add_risktable()+
+  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
+  scale_fill_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))
+  
 plotsprout
 
-plotmold<-ggcuminc(cra, outcome=c("2"))
+plotmold<-ggcuminc(cra, outcome=c("2"))+
+  add_confidence_interval(color=NA)+
+  add_risktable()+ 
+  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
+  scale_fill_manual(name="Treatment",values=c("azure4","salmon4","darkblue","salmon4"))
+
 plotmold
+
+
 
 plotPredated<-ggcuminc(cra, outcome=c("3"))
 plotPredated
@@ -379,32 +397,36 @@ plottt
 Now running FineGrey for LARA, this looks at the effect of different explanatory varibles on our outcome we choose 
 ```{r}
 #CIF for sprouting
-m1 <- crr(Surv(DaysUntilEvent, Fate) ~ Treatment + Mass,
+m1 <- crr(Surv(DaysUntilEvent, Fate) ~ Treatment + Mass+SiteID,
          failcode = "1",
          data = LARAcr)
 
 m1
 
-#Variable         Coef    SE      HR     95% CI       p-value    
-#TreatmentFresh   2.23    0.241   9.32   5.81, 14.9   <0.001     
-#TreatmentSalt    1.83    0.232   6.24   3.96, 9.82   <0.001     
-#TreatmentSoil    1.24    0.235   3.46   2.18, 5.48   <0.001     
-#Mass             0.556   0.277   1.74   1.01, 3.00   0.045  
+#Variable                 Coef    SE      HR     95% CI       p-value    
+#TreatmentFresh           2.23    0.242   9.28   5.78, 14.9   <0.001     
+#TreatmentSalt            1.82    0.233   6.17   3.91, 9.73   <0.001     
+#TreatmentSoil            1.24    0.235   3.46   2.18, 5.49   <0.001     
+#Mass                     0.668   0.328   1.95   1.02, 3.71   0.042      
+#SiteIDSTEER              0.189   0.142   1.21   0.91, 1.60   0.18       
+#SiteIDVessup Salt Pond   0.131   0.131   1.14   0.88, 1.47   0.32 
 
 
 
 
 #CIF for mold
-m2<-crr(Surv(DaysUntilEvent, Fate) ~ Treatment + Mass,
+m2<-crr(Surv(DaysUntilEvent, Fate) ~ Treatment + Mass+ SiteID,
          failcode = "2",
          data = LARAcr)
 m2
 
-#Variable         Coef    SE      HR     95% CI       p-value    
-#TreatmentFresh   -12.9   0.243   0.00   0.00, 0.00   <0.001     
-#TreatmentSalt    -12.9   0.255   0.00   0.00, 0.00   <0.001     
-#TreatmentSoil    -1.56   0.488   0.21   0.08, 0.55   0.001      
-#Mass             0.867   0.923   2.38   0.39, 14.5   0.35 
+#Variable                 Coef     SE      HR     95% CI       p-value    
+#TreatmentFresh           -12.9    0.243   0.00   0.00, 0.00   <0.001     
+#TreatmentSalt            -12.9    0.251   0.00   0.00, 0.00   <0.001     
+#TreatmentSoil            -1.58    0.489   0.21   0.08, 0.54   0.001      
+#Mass                     0.508    1.10    1.66   0.19, 14.3   0.64       
+#SiteIDSTEER              -0.352   0.548   0.70   0.24, 2.06   0.52       
+#SiteIDVessup Salt Pond   -0.034   0.501   0.97   0.36, 2.58   0.95    
 
 
 #this is a way to export the data directly from r into a table might investigate this more later!

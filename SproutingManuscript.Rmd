@@ -5,63 +5,15 @@ date: "2026-01-12"
 output: html_document
 ---
 
+
+Going to transfer code here only what is used in pub
 ```{r Cleaning Data}
-library(readr)
-library(tidyverse)
 
-#removed the two reps where intake radicle length was 10 in excel prior to import, this length is impossible 
+```
 
-sprout <- read_csv("Sprouting Experiment/data/E1 LARA_AVGE intake experiment Fall 2022 - MasterData.csv")
+Competing risks analysis
 
-sprout<-sprout%>%filter(`IntakeDate`!="11/7/22")#remove the one random intake on 11/7 
+```{r}
 
-##replace the <0.01 with 0.005 (essentially <RL is changed to half of the reporting limit)
-sprout$`IntakeRadicleLength-cm`[sprout$`IntakeRadicleLength-cm`=="<0.1"]<-0.005
-
-#change all NA to 0, in intake radical length
-sprout$`IntakeRadicleLength-cm`[is.na(sprout$`IntakeRadicleLength-cm`)] <- 0
-
-
-#split the tray number and treatment type into two separate columns so I can plot separately 
-sprout<-sprout%>%separate(`Tray ID`, into = c("Treatment","Tray Number"), sep = " ")
-
-#write an if else statement to make sprouted or not 0 or 1
-#sprouted-1
-#not sprouted-0
-sprout$sprouted<-ifelse(sprout$SproutDate=="NA",'0','1')
-
-#made not sprouted NA instead of 0, so changing NA to 0 in sprouted column
-sprout$sprouted[is.na(sprout$sprouted)]<-0
-
-sprout$SiteID<-gsub("STEER Basin", "STEER", sprout$SiteID)
-
-
-#filter the props by species
-LARA<-sprout%>%filter(Species=="LARA")
-AVGE<-sprout%>%filter(Species=="AVGE")
-
-
-#going to remove an outlier in AVGE (likely typo)
-AVGE<-AVGE%>%
-  filter(PropaguleLength!=0.40)
-#some widths that are weirdly large, they were likely measured in cm, convert to mm
-AVGE<-AVGE%>%
-  mutate(`Width-mm`=if_else(`Width-mm`<7, `Width-mm`*10, `Width-mm`))
-
-# i think these LARA widths were likely accidentally measured in cm, going to convert to mm
-LARA<-LARA%>%
-  mutate(`Width-mm`=if_else(`Width-mm`<4, `Width-mm`*10, `Width-mm`))
-
-#sprouted as numeric
-AVGE$sprouted<-as.numeric(AVGE$sprouted)
-LARA$sprouted<-as.numeric(LARA$sprouted)
-
-#intake radicle length
-as numeric
-AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
-
-#sproutdate and intake date as dates
-sprout$SproutDate<-mdy(sprout$SproutDate)
-sprout$IntakeDate<-mdy(sprout$IntakeDate)
 ```
 
