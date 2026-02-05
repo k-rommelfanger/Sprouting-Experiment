@@ -87,6 +87,34 @@ sprout$IntakeDate<-mdy(sprout$IntakeDate)
 ```
 
 
+Look at the total number sprouted per site per treatment
+
+```{r}
+LARAsprout<-LARA%>%
+  group_by(SiteID, Treatment, sprouted)%>%
+  summarise(N=n())%>%
+  pivot_wider(names_from = Treatment, values_from = N)
+
+
+#%>%
+  filter(sprouted==1)%>%
+  ggplot(aes(x=SiteID, y=N, fill=Treatment))+
+  geom_col(position="dodge")
+
+LARAsprout
+
+AVGEsprout<-AVGE%>%
+  group_by(SiteID, Treatment, sprouted)%>%
+  summarise(N=n())%>%
+  filter(sprouted==1)%>%
+  ggplot(aes(x=SiteID, y=N, fill=Treatment))+
+  geom_col(position="dodge")
+
+AVGEsprout
+
+```
+
+
 Look at propagule bouyancy across collection sites, and across treatments
 
 ```{r Float/No Float}
@@ -1450,6 +1478,11 @@ LARAlogitplot<-ggplot(LARApredict1, aes(x = Treatment, y = pred_prob, color = Si
   theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))
    
    LARAlogitplot
+   
+ #i like the plots holding mass and radicle lenght constant
+   
+finallogitplots<-LARAlogitplot+AVGElogitplot
+finallogitplots
 
 ```
 
@@ -2388,7 +2421,7 @@ library(rcompanion)#for cldList function
 library(ggforce)#for sina
 
 #2) KW no sprout removed
-TLARA<-GermSprout%>%
+TLARA<-lubesprout%>%
   filter(Species=="LARA")%>%
   select(SiteID, Treatment, DaysUntilSprout)
 
@@ -2398,11 +2431,21 @@ TLARA$DaysUntilSprout<-as.numeric(TLARA$DaysUntilSprout)
 LARAR<-TLARA%>%
   filter(DaysUntilSprout!=0)
 
+#calculate average days until sprouting by treatment
+Llubecheck<-lubesprout%>%
+  group_by(Species, Treatment)%>%
+  summarise(mean=mean(DaysUntilSprout))%>%
+  filter(Species=="LARA")
+
+
+
+
 SproutLARAViolinPlot<-LARAR%>%
   ggplot(aes(x=Treatment, y=DaysUntilSprout, color=Treatment))+#setting my x and y values, 
   geom_violin()+#
     geom_sina()+#adds all the dots to the violin plot needs ggforce library
     geom_boxplot(width=0.1, color="black", alpha=0.2)+
+  geom_point(aes(x=Treatment, y=mean), data=Llubecheck,shape=15, color="red")+
   ggtitle(expression(italic("L. racemosa") ~ "Treatment Effect on Days Until Sprouting"))+
   ylab("Days Until Sprout")+
   xlab("Treatment")+
@@ -2462,11 +2505,16 @@ This is running KW with the ones that didnt sprout removed for AVGE, and plottin
 ```{r FINAL KW choice AVGE}
 #2) KW no sprout removed
 
-TAVGE<-GermSprout%>%
+TAVGE<-lubesprout%>%
   filter(Species=="AVGE")%>%
   select(SiteID, Treatment, DaysUntilSprout)
 
 TAVGE$DaysUntilSprout<-as.numeric(TAVGE$DaysUntilSprout)
+
+Alubecheck<-lubesprout%>%
+  group_by(Species, Treatment)%>%
+  summarise(mean=mean(DaysUntilSprout))%>%
+  filter(Species=="AVGE")
 
 #filter to remove props that did not sprout
 AVGER<-TAVGE%>%
@@ -2477,6 +2525,7 @@ SproutAVGEViolinPlot<-AVGER%>%
   geom_violin()+#
     geom_sina()+#adds all the dots to the violin plot needs ggforce library
     geom_boxplot(width=0.1, color="black", alpha=0.2)+
+  geom_point(aes(x=Treatment, y=mean), data=Alubecheck,shape=15, color="red")+
  ggtitle(expression(italic("A. germinans") ~ "Treatment Effect on Days Until Sprouting"))+
   ylab("Days Until Sprout")+
   xlab("Treatment")+

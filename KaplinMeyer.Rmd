@@ -285,6 +285,11 @@ unique(sprout$DaysUntilEvent)
 
 LARAcr<-sprout%>%
   filter(Species=="LARA")
+
+```
+
+
+#```{r}
 #need to turn off tidycmprsk for this to run
 cif <- with(LARAcr, cuminc(DaysUntilEvent, Fate, group = Treatment))
 
@@ -350,24 +355,26 @@ plotchat
 
 #repeat plots for all incedence 
 
-```
 
-Checking things make again using a different package
+#```
+
+
+
 ```{r}
 library(tidycmprsk)
 library(ggsurvfit)
 #this package interacts badly with cmprsk, need to turn this off in order to run one from this package
 str(LARAcr)
-
+LARAcr$SiteID<-as.factor(LARAcr$SiteID)
 LARAcr$Fate<-as.factor(LARAcr$Fate)
-cra<-cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = LARAcr)
+cra<-tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = LARAcr)
 
 
 LARAplotsprout<-ggcuminc(cra, outcome = c("1"))+
   add_confidence_interval(color=NA)+
   add_risktable()+
-  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
-  scale_fill_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
+  scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
+  scale_fill_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
    ggtitle(expression(italic("L. racemosa")))+
   theme(plot.title = element_text(hjust = 0.5))
   
@@ -376,8 +383,8 @@ LARAplotsprout
 plotmold<-ggcuminc(cra, outcome=c("2"))+
   add_confidence_interval(color=NA)+
   add_risktable()+ 
-  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
-  scale_fill_manual(name="Treatment",values=c("azure4","salmon4","darkblue","salmon4"))
+  scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
+  scale_fill_manual(name="Treatment",values=c("olivedrab","salmon4","darkblue","salmon4"))
 
 plotmold
 
@@ -396,6 +403,53 @@ plottt
 
 ```
 
+plotting separtely for each site LARA
+```{r}
+cuminc_list <- LARAcr %>%
+  group_by(SiteID) %>%
+  group_map(~ tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = .x), .keep = TRUE)
+
+
+plots <- lapply(seq_along(cuminc_list), function(i) {
+  ggcuminc(cuminc_list[[i]], outcome = "1") +
+    add_confidence_interval(alpha = 0.2) +
+    scale_color_manual(name = "Treatment",
+                       values = c("azure4","cornflowerblue","darkblue","salmon4")) +
+    scale_fill_manual(name = "Treatment",
+                      values = c("azure4","cornflowerblue","darkblue","salmon4")) +
+    ggtitle(paste0("Site: ", levels(LARAcr$SiteID)[i])) +
+    theme(plot.title = element_text(hjust = 0.5))
+})
+
+# Combine all plots into one figure
+combined_plot <- wrap_plots(plots, ncol = 1)
+combined_plot
+```
+
+Plotting separately for each site AVGE
+```{r}
+
+AVGEcr$Float<-as.factor(AVGEcr$Float)
+cuminc_list <- AVGEcr %>%
+  group_by(Float) %>%
+  group_map(~ tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = .x), .keep = TRUE)
+
+
+plots <- lapply(seq_along(cuminc_list), function(i) {
+  ggcuminc(cuminc_list[[i]], outcome = "1") +
+    add_confidence_interval(alpha = 0.2) +
+    scale_color_manual(name = "Treatment",
+                       values = c("azure4","cornflowerblue","darkblue","salmon4")) +
+    scale_fill_manual(name = "Treatment",
+                      values = c("azure4","cornflowerblue","darkblue","salmon4")) +
+    ggtitle(paste0("Site: ", levels(LARAcr$SiteID)[i])) +
+    theme(plot.title = element_text(hjust = 0.5))
+})
+
+# Combine all plots into one figure
+combined_plot <- wrap_plots(plots, ncol = 1)
+combined_plot
+```
 
 Now running FineGrey for LARA, this looks at the effect of different explanatory varibles on our outcome we choose 
 ```{r}
@@ -451,14 +505,14 @@ unique(AVGEcr$Treatment)
 unique(AVGEcr$Fate)
 
 AVGEcr$Fate<-as.factor(AVGEcr$Fate)
-Acra<-cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = AVGEcr)
+Acra<-tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = AVGEcr)
 #getting warning message need to investigate!
 
 AVGEplotsprout<-ggcuminc(Acra, outcome = c("1"))+
   add_confidence_interval(color=NA)+
   add_risktable()+ 
-  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
-  scale_fill_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
+  scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
+  scale_fill_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
   ggtitle(expression(italic("A. germinans")))+
   theme(plot.title = element_text(hjust = 0.5))
 AVGEplotsprout
@@ -466,7 +520,7 @@ AVGEplotsprout
 
 #combine lara and avge
 
-SproutPlot<-LARAplotsprout/AVGEplotsprout
+SproutPlot<-LARAplotsprout+AVGEplotsprout
 SproutPlot
 
 #getting a warning, removed 14 rows containint missing values or balues outside scale range need to investigate 
