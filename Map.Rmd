@@ -1,0 +1,232 @@
+---
+title: "Map"
+author: "Kaitlin Rommelfanger"
+date: "2026-02-18"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(sf)
+library(ggplot2)
+library(rnaturalearth)
+
+
+
+land <- ne_countries(
+  scale = 10,   # ← numeric 10, NOT "large"
+  returnclass = "sf"
+)
+
+bbox_thomas <- st_as_sfc(st_bbox(c(
+  xmin = -65.05, ymin = 18.28,
+  xmax = -64.80, ymax = 18.42
+), crs = 4326))
+
+land_thomas <- st_crop(land, bbox_thomas)
+
+ggplot() +
+  geom_sf(data = land_thomas,
+          fill = "grey90",
+          color = "black",
+          linewidth = 0.3) +
+  coord_sf(xlim = c(-65.05, -64.80),
+           ylim = c(18.28, 18.42),
+           expand = FALSE) +
+  theme_minimal()
+
+```
+
+
+```{r}
+# ====== PACKAGES ==============================================================
+library(ggplot2)
+library(sf)
+library(osmdata)
+library(ggspatial)
+library(dplyr)
+library(ggrepel)
+library(grid)              
+library(rnaturalearth)    
+library(rnaturalearthdata)
+library(curl)
+
+# ====== SITE DATA =============================================================
+sites <- data.frame(
+  Name = c("CAHS", "IEKHS", "Antilles School", "BCB (field trips)",
+           "Hull Bay", "STEER", "Range Cay Nursery (UVI)",
+           "Complex High (STX)", "Altona Lagoon", "Salt River Bay", "Feather Leaf Inn"),
+  Type = c("School", "School", "School", "School",
+           "Field Site", "Field Site", "Field Site",
+           "School", "Field Site", "Field Site", "Field Site"),
+  Island = c("St. Thomas", "St. Thomas", "St. Thomas", "St. Thomas",
+             "St. Thomas", "St. Thomas", "St. Thomas",
+             "St. Croix", "St. Croix", "St. Croix", "St. Croix"),
+  Latitude = c(18.3420, 18.3249, 18.3235, 18.3179,
+               18.3703, 18.3147, 18.3365,
+               17.7361, 17.7513, 17.7767, 17.748956),
+  Longitude = c(-64.9196, -64.8544, -64.9101, -64.8910,
+                -64.9546, -64.8495, -64.9751,
+                -64.7656, -64.6924, -64.7617, -64.891855)
+)
+
+sites_sf <- st_as_sf(sites, coords = c("Longitude", "Latitude"), crs = 4326)
+st_thomas_sites <- dplyr::filter(sites_sf, Island == "St. Thomas")
+st_croix_sites  <- dplyr::filter(sites_sf, Island == "St. Croix")
+
+# ====== BOUNDING BOXES ========================================================
+bbox_thomas <- c(xmin = -65.05, ymin = 18.28, xmax = -64.80, ymax = 18.42)
+bbox_croix  <- c(xmin = -64.92, ymin = 17.68, xmax = -64.56, ymax = 17.88)
+bbox_global <- c(xmin = -90.00, ymin = 10.00, xmax = -55.00, ymax = 30.00)
+
+# ====== OVERPASS SETTINGS =====================================================
+options(osmdata_overpass_url = "https://overpass.kumi.systems/api/interpreter")
+options(osmdata_timeout = 120)
+
+
+fetch_osm_coast <- function(bbox) {
+  tryCatch(
+    {
+      opq(bbox = bbox, timeout = 120) |>
+        add_osm_feature(key = "natural", value = "coastline") |>
+        osmdata_sf()
+    },
+    error = function(e) NULL
+  )
+}
+
+# OSM for islands
+coastline_thomas <- fetch_osm_coast(bbox_thomas)
+coastline_croix  <- fetch_osm_coast(bbox_croix)
+
+# Natural Earth for Caribbean
+coast_world <- rnaturalearth::ne_coastline(scale = "medium", returnclass = "sf")
+carib_poly <- sf::st_sfc(
+  sf::st_polygon(list(matrix(c(
+    -90, 10,
+    -55, 10,
+    -55, 30,
+    -90, 30,
+    -90, 10
+  ), ncol = 2, byrow = TRUE))),
+  crs = 4326
+)
+coast_carib <- suppressWarnings(sf::st_intersection(coast_world, carib_poly))
+
+# ====== COLORS & SHAPES =======================================================
+colors <- c("School" = "#3366FF", "Field Site" = "#33CC33")
+shape_vals <- c("School" = 16, "Field Site" = 17)
+
+# ====== ST. THOMAS MAP ========================================================
+st_thomas_map <- ggplot() +
+  { if (!is.null(coastline_thomas) && !is.null(coastline_thomas$osm_lines))
+    geom_sf(data = coastline_thomas$osm_lines, color = "black", linewidth = 0.4)
+  } +
+  geom_sf(data = st_thomas_sites, aes(color = Type, shape = Type), size = 3) +
+  geom_text_repel(
+    data = st_thomas_sites,
+    aes(geometry = geometry, label = Name),
+    stat = "sf_coordinates",
+    size = 3, max.overlaps = Inf, nudge_y = 0.005
+  ) +
+  coord_sf(xlim = bbox_thomas[c("xmin", "xmax")],
+           ylim = bbox_thomas[c("ymin", "ymax")], expand = FALSE) +
+  scale_color_manual(values = colors, name = "Site type") +
+  scale_shape_manual(values = shape_vals, name = "Site type") +
+  guides(
+    color = guide_legend(order = 1, override.aes = list(size = 5)),
+    shape = guide_legend(order = 1, override.aes = list(size = 5))
+  ) +
+  annotation_north_arrow(
+    location = "tr", which_north = "true",
+    pad_x = grid::unit(0.3, "in"), pad_y = grid::unit(0.2, "in"),
+    style = north_arrow_fancy_orienteering()
+  ) +
+  labs(title = "MIC Sites in St. Thomas, USVI", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(
+    #legend.position = c(0.03, 0.97),
+    legend.justification = c("left", "top"),
+    legend.background = element_rect(fill = "white", color = "grey80"),
+    legend.key.size = grid::unit(0.4, "in"),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 13, face = "bold")
+  )
+
+st_thomas_map
+
+# ====== ST. CROIX MAP =========================================================
+st_croix_map <- ggplot() +
+  { if (!is.null(coastline_croix) && !is.null(coastline_croix$osm_lines))
+    geom_sf(data = coastline_croix$osm_lines, color = "black", linewidth = 0.4)
+  } +
+  geom_sf(data = st_croix_sites, aes(color = Type, shape = Type), size = 3) +
+  geom_text_repel(
+    data = st_croix_sites,
+    aes(geometry = geometry, label = Name),
+    stat = "sf_coordinates",
+    size = 3, max.overlaps = Inf,
+    box.padding = 0.5, point.padding = 0.3
+  ) +
+  coord_sf(xlim = bbox_croix[c("xmin", "xmax")],
+           ylim = bbox_croix[c("ymin", "ymax")], expand = FALSE) +
+  scale_color_manual(values = colors, name = "Site type") +
+  scale_shape_manual(values = shape_vals, name = "Site type") +
+  guides(
+    color = guide_legend(order = 1, override.aes = list(size = 5)),
+    shape = guide_legend(order = 1, override.aes = list(size = 5))
+  ) +
+  annotation_north_arrow(
+    location = "tr", which_north = "true",
+    pad_x = grid::unit(0.3, "in"), pad_y = grid::unit(0.2, "in"),
+    style = north_arrow_fancy_orienteering()
+  ) +
+  labs(title = "MIC Sites in St. Croix, USVI", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(
+    legend.position = c(0.03, 0.97),
+    legend.justification = c("left", "top"),
+    legend.background = element_rect(fill = "white", color = "grey80"),
+    legend.key.size = grid::unit(0.4, "in"),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 13, face = "bold")
+  )
+
+st_croix_map
+
+# ====== CARIBBEAN MAP =========================================================
+# Helper for circle
+circle_df <- function(cx, cy, r_lon = 0.35, r_lat = 0.35, n = 360) {
+  th <- seq(0, 2*pi, length.out = n)
+  data.frame(x = cx + r_lon * cos(th), y = cy + r_lat * sin(th))
+}
+usvi_ring <- circle_df(cx = -64.75, cy = 18.35, r_lon = 0.35, r_lat = 0.35)
+
+caribbean_map <- ggplot() +
+  geom_sf(data = coast_carib, color = "black", linewidth = 0.4) +
+  coord_sf(xlim = c(-90, -55), ylim = c(10, 30), expand = FALSE) +
+  geom_path(data = usvi_ring, aes(x, y),
+            color = "red", linewidth = 1.3, linetype = "dashed") +
+  annotate("text", x = -64.8, y = 18.95, label = "U. S. Virgin Islands",
+           size = 4, fontface = "bold") +
+  annotation_north_arrow(
+    location = "tr", which_north = "true",
+    pad_x = grid::unit(0.3, "in"), pad_y = grid::unit(0.2, "in"),
+    style = north_arrow_fancy_orienteering()
+  ) +
+  labs(title = "Map of the Caribbean", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(legend.position = "none")  # hide legend here
+caribbean_map
+print(caribbean_map)
+# ====== SAVE MAPS =============================================================
+ggsave("st_thomas_map.png", plot = st_thomas_map, width = 10, height = 8, dpi = 300, bg = "white")
+ggsave("st_croix_map.png",  plot = st_croix_map,  width = 10, height = 8, dpi = 300, bg = "white")
+ggsave("caribbean_map.png", plot = caribbean_map, width = 10, height = 8, dpi = 300, bg = "white")
+
+
+
+
+```
+

@@ -140,8 +140,14 @@ removalplotLARA<-totalpropsplot%>%
   geom_col(position="stack")+
   ylab("Number of Propagules")+
   ggtitle(expression(italic("L. racemosa")))+
-  theme(plot.title = element_text(hjust = 0.5))+
-  scale_fill_manual(values=c("Censored"="#001400","experiment end"="#40826D", "dead"="salmon4","predation"="olivedrab","mold"="darkolivegreen1","Sprouted"="#355E3B"), labels=c("Censored"="Censored","experiment end"="Experiment End", "dead"="Dead","predation"="Predation","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+
+  scale_fill_manual(values=c("Censored"="#001400","experiment end"="#40826D", "dead"="salmon4","predation"="olivedrab","mold"="darkolivegreen1","Sprouted"="#355E3B"), labels=c("Censored"="Censored","experiment end"="Experiment End", "dead"="Dead","predation"="Predation","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")+
+  scale_x_discrete(labels = c(
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil",
+  "Air"="No Substrate"
+))
 
 removalplotLARA
 
@@ -151,8 +157,14 @@ removalplotAVGE<-totalpropsplot%>%
   geom_col(position="stack")+
   ylab("Number of Propagules")+
   ggtitle(expression(italic("A. germinans")))+
-  theme(plot.title = element_text(hjust = 0.5))+
-  scale_fill_manual(values=c("Censored"="#001400","dead"="salmon4","mold"="darkolivegreen1","Sprouted"="#355E3B"), labels=c("Censored"="Censored", "dead"="Dead","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+
+  scale_fill_manual(values=c("Censored"="#001400","dead"="salmon4","mold"="darkolivegreen1","Sprouted"="#355E3B"), labels=c("Censored"="Censored", "dead"="Dead","mold"="Mold","Sprouted"="Sprouted"),name="Reason for Removal")+
+  scale_x_discrete(labels = c(
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil",
+  "Air"="No Substrate"
+))
   
 
 "#738F52"
@@ -172,6 +184,7 @@ removalplotAVGE
 
 removalplot<-removalplotLARA+removalplotAVGE
 removalplot
+#make sure to export wider, so bars show up fatter and easier to see when actually ggsave these!
 
 cvdPlot(removalplot)
 
@@ -190,8 +203,10 @@ Paper explaining how to interpret the results
 Austin, P. C., & Fine, J. P. (2017). Practical recommendations for reporting F ine‐G ray model analyses for competing risk data. Statistics in medicine, 36(27), 4391-4400.
 
 
-#another source for competing risks 
+#another source for competing risks (good plain language descr)
 https://www.publichealth.columbia.edu/research/population-health-methods/competing-risk-analysis?utm_source=chatgpt.com 
+
+
 
 ```{r}
 library(riskRegression)
@@ -365,6 +380,12 @@ library(tidycmprsk)
 library(ggsurvfit)
 #this package interacts badly with cmprsk, need to turn this off in order to run one from this package
 str(LARAcr)
+LARAcr <- LARAcr %>%
+  mutate(Treatment = factor(
+    Treatment,
+    levels = c("Fresh", "Salt", "Soil", "Air"),
+    labels = c("Freshwater", "Saltwater", "Soil", "No Substrate")
+  ))
 LARAcr$SiteID<-as.factor(LARAcr$SiteID)
 LARAcr$Fate<-as.factor(LARAcr$Fate)
 cra<-tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = LARAcr)
@@ -373,10 +394,11 @@ cra<-tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = LARAcr)
 LARAplotsprout<-ggcuminc(cra, outcome = c("1"))+
   add_confidence_interval(color=NA)+
   add_risktable()+
-  scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
-  scale_fill_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
+  scale_color_manual(name="Treatment",values=c("cornflowerblue","olivedrab","darkblue","salmon4"))+
+  scale_fill_manual(name="Treatment",values=c("cornflowerblue","olivedrab","darkblue","salmon4"))+
    ggtitle(expression(italic("L. racemosa")))+
   theme(plot.title = element_text(hjust = 0.5))
+ 
   
 LARAplotsprout
 
@@ -500,9 +522,17 @@ library(ggsurvfit)
 AVGEcr<-sprout%>%
   filter(Species=="AVGE")
 
+
 unique(AVGEcr$DaysUntilEvent)
 unique(AVGEcr$Treatment)
 unique(AVGEcr$Fate)
+
+AVGEcr <- AVGEcr %>%
+  mutate(Treatment = factor(
+    Treatment,
+    levels = c("Fresh", "Salt", "Soil", "Air"),
+    labels = c("Freshwater", "Saltwater", "Soil", "No Substrate")
+  ))
 
 AVGEcr$Fate<-as.factor(AVGEcr$Fate)
 Acra<-tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = AVGEcr)
@@ -511,8 +541,8 @@ Acra<-tidycmprsk::cuminc(Surv(DaysUntilEvent, Fate) ~ Treatment, data = AVGEcr)
 AVGEplotsprout<-ggcuminc(Acra, outcome = c("1"))+
   add_confidence_interval(color=NA)+
   add_risktable()+ 
-  scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
-  scale_fill_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
+  scale_color_manual(name="Treatment",values=c("cornflowerblue","olivedrab","darkblue","salmon4"))+
+  scale_fill_manual(name="Treatment",values=c("cornflowerblue","olivedrab","darkblue","salmon4"))+
   ggtitle(expression(italic("A. germinans")))+
   theme(plot.title = element_text(hjust = 0.5))
 AVGEplotsprout

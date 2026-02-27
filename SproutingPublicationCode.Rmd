@@ -115,6 +115,191 @@ AVGEsprout
 ```
 
 
+Plot intake char vs sprout/notsprout see if it looks like there are differences in intake char of those that sprouted or didn't sprout
+```{r}
+
+library(ggforce)#geomsina
+library(patchwork)
+
+#look at AVGE
+
+AVGE$sprouted<-as.factor(AVGE$sprouted)
+
+meanlenght<-AVGE%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(PropaguleLength))
+
+sproutplot<-AVGE%>%
+  ggplot(aes(x=sprouted, y=PropaguleLength, color=sprouted))+
+  geom_violin()+
+  geom_sina()+
+  geom_boxplot(width=0.1)+
+  ylab("Length (cm)")+
+  geom_point(data=meanlenght, aes(x=sprouted, y=mean), color="red")+
+   ggtitle(expression(italic("A. germinans")~"Length"))+
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Sprouted", values = c("salmon4","darkgreen"))+#sets the colors manually of the dots, and outlines of violin plots
+  scale_x_discrete(labels=c("Did Not Sprout","Sprouted"))
+
+sproutplot
+
+
+meanradlenght<-AVGE%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(`IntakeRadicleLength-cm`))
+
+sproutplotRadL<-AVGE%>%
+  ggplot(aes(x=sprouted, y=`IntakeRadicleLength-cm`, color=sprouted))+
+  geom_violin()+
+  geom_sina()+
+  geom_boxplot(width=0.1)+
+  xlab(" ")+
+  ylab("Radicle Length (cm)")+
+  geom_point(data=meanradlenght, aes(x=sprouted, y=mean), color="red")+
+  ggtitle(expression(italic("A. germinans")~"Radicle Length"))+
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Sprouted", values = c("salmon4","darkgreen"))+#sets the colors manually of the dots, and outlines of violin plots
+  scale_x_discrete(labels=c("Did Not Sprout","Sprouted"))
+
+sproutplotRadL
+
+
+#look for LARA
+
+LARA$sprouted<-as.factor(LARA$sprouted)
+
+meanmass<-LARA%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(Mass))
+
+sproutplotLARA<-LARA%>%
+  ggplot(aes(x=sprouted, y=Mass, color=sprouted))+
+  geom_violin()+
+   geom_sina()+
+  geom_boxplot(width=0.1)+
+  xlab(" ")+
+  ylab("Mass (g)")+
+  ggtitle(expression(italic("L. racemosa")~"mass"))+
+  geom_point(data=meanmass, aes(x=sprouted, y=mean), color="red")+
+   theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Sprouted", values = c("salmon4","darkgreen"))+#sets the colors manually of the dots, and outlines of violin plots
+  scale_x_discrete(labels=c("Did Not Sprout","Sprouted"))
+
+sproutplotLARA
+
+TTestplot<-sproutplotLARA/sproutplotRadL/sproutplot
+TTestplot
+
+```
+
+Run a T test or Nonparametric test checking For differences between those that sprouted and those that didn't
+
+```{r}
+library(rstatix)
+
+#Check Assumptions
+
+#LARA mass
+
+#shapiro normality
+shapiro.test(LARA$Mass)
+#Shapiro-Wilk normality test
+
+#data:  LARA$Mass
+#W = 0.9063, p-value = 4.136e-14
+
+hist(LARA$Mass)
+#nonparametric
+wilcox.test(Mass~sprouted, LARA)
+#Wilcoxon rank sum test with continuity correction
+
+#data:  Mass by sprouted
+#W = 11087, p-value = 0.06354
+#alternative hypothesis: true location shift is not equal to 0
+
+
+#AVGE radicle length
+shapiro.test(AVGE$`IntakeRadicleLength-cm`)
+wilcox.test(`IntakeRadicleLength-cm`~sprouted, AVGE)
+#Wilcoxon rank sum test with continuity correction
+
+#data:  IntakeRadicleLength-cm by sprouted
+#W = 11846, p-value = 0.7609
+#alternative hypothesis: true location shift is not equal to 0
+
+#AVGE length
+shapiro.test(AVGE$PropaguleLength)
+wilcox.test(PropaguleLength~sprouted, AVGE)
+
+#Wilcoxon rank sum test with continuity correction
+
+#data:  PropaguleLength by sprouted
+#W = 11593, p-value = 0.5473
+#alternative hypothesis: true location shift is not equal to 0
+
+
+```
+
+
+Facet by treatment (This isnt useful)
+
+```{r}
+AVGE$sprouted<-as.factor(AVGE$sprouted)
+
+
+
+sproutplot<-AVGE%>%
+  ggplot(aes(x=sprouted, y=PropaguleLength))+
+  geom_violin()+
+   geom_sina()+
+  geom_boxplot(width=0.1)+
+ # geom_point(data=meanlenght, aes(x=sprouted, y=mean), color="red")+
+  ggtitle("Propagule Length")+
+  facet_wrap(~Treatment)
+
+sproutplot
+
+
+meanradlenght<-AVGE%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(`IntakeRadicleLength-cm`))
+
+sproutplotRadL<-AVGE%>%
+  ggplot(aes(x=sprouted, y=`IntakeRadicleLength-cm`))+
+  geom_violin()+
+   geom_sina()+
+  geom_boxplot(width=0.1)+
+  geom_point(data=meanradlenght, aes(x=sprouted, y=mean), color="red")+
+  ggtitle("Intake Rad Length")+
+  facet_wrap(~Treatment)
+
+sproutplotRadL
+
+AVGEplot<-sproutplot+sproutplotRadL
+AVGEplot
+
+
+
+
+#look for LARA
+
+LARA$sprouted<-as.factor(LARA$sprouted)
+
+meanmass<-LARA%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(Mass))
+
+sproutplotLARA<-LARA%>%
+  ggplot(aes(x=sprouted, y=Mass))+
+  geom_violin()+
+   geom_sina()+
+  geom_boxplot(width=0.1)+
+  geom_point(data=meanmass, aes(x=sprouted, y=mean), color="red")+
+  facet_wrap(~Treatment)
+
+sproutplotLARA
+```
+
 Look at propagule bouyancy across collection sites, and across treatments
 
 ```{r Float/No Float}
@@ -1143,7 +1328,13 @@ AVGElogitplot<-ggplot(AVGEpredict, aes(x = Treatment, y = prob, color = Float)) 
   ggtitle(expression(italic("A. germinans")~"Predicted Sprouting Probability"))+
    scale_color_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
                     name = "Bouyancy", labels=c( "Floated", "Did Not Float"))+
-  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
+  scale_x_discrete(labels = c(
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil",
+  "Air"="No Substrate"
+))
 
 AVGElogitplot
 
@@ -1422,7 +1613,13 @@ LARApredplot<-ggplot(LARApredict, aes(x = Mass, y = pred_prob, color = Treatment
   theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
   scale_fill_manual(name="Treatment",values=c("cornflowerblue","darkblue","salmon4","azure4"))+
   scale_color_manual(name="Treatment",values=c("cornflowerblue","darkblue","salmon4","azure4"))+
-  facet_wrap(~SiteID)
+  facet_wrap(~SiteID)+
+  scale_x_discrete(labels = c(
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil",
+  "Air"="No Substrate"
+))
 
 LARApredplot
 
@@ -1432,14 +1629,14 @@ LARApredplot
 logitplot<-LARApredplot+AVGElogitplot
 logitplot
 
-ggsave(
-  filename = "logitplot.jpg",  # output file name
-  plot = logitplot,            # your ggplot object
-  width = 3000,                      # width in pixels
+#ggsave(
+#  filename = "logitplot.jpg",  # output file name
+#  plot = logitplot,            # your ggplot object
+#  width = 3000,                      # width in pixels
   height = 1500,                     # height in pixels
-  units = "px",                      # set units to pixels
-  dpi = 300                          # resolution
-)
+#  units = "px",                      # set units to pixels
+#  dpi = 300                          # resolution
+#)
 ```
 
 What does it look like if i hold mass constant and have site and treatment?
@@ -1475,7 +1672,13 @@ LARAlogitplot<-ggplot(LARApredict1, aes(x = Treatment, y = pred_prob, color = Si
   ggtitle(expression(italic("L. racemosa")~"Predicted Sprouting Probability"))+
    scale_color_manual(values = c("Vessup Salt Pond" = "olivedrab", "STEER" = "salmon4","Compass Point"="darkgreen"),
                     name = "Site ID", labels=c( "Vessup Salt Pond", "STEER","Compass Point"))+
-  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
+  scale_x_discrete(labels = c(
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil",
+  "Air"="No Substrate"
+))
    
    LARAlogitplot
    
