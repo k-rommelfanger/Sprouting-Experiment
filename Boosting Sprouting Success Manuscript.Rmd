@@ -1,0 +1,1931 @@
+---
+title: "Boost Sprouting Success"
+author: "Kaitlin Rommelfanger"
+date: "2026-03-11"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+ The only csv you need for this code is E1 LARA_AVGE intake experiment Fall 2022 - MasterData.csv
+
+```{r Cleaning Data}
+library(readr)
+library(tidyverse)
+
+#removed the two reps where intake radicle length was 10 in excel prior to import, this length is impossible 
+
+sprout <- read_csv("Sprouting Experiment/data/E1 LARA_AVGE intake experiment Fall 2022 - MasterData.csv")
+
+sprout<-sprout%>%filter(`IntakeDate`!="11/7/22")#remove the one random intake on 11/7 
+
+##replace the <0.01 with 0.005 (essentially <RL is changed to half of the reporting limit)
+sprout$`IntakeRadicleLength-cm`[sprout$`IntakeRadicleLength-cm`=="<0.1"]<-0.005
+
+#change all NA to 0, in intake radical length
+sprout$`IntakeRadicleLength-cm`[is.na(sprout$`IntakeRadicleLength-cm`)] <- 0
+
+
+#split the tray number and treatment type into two separate columns so I can plot separately 
+sprout<-sprout%>%separate(`Tray ID`, into = c("Treatment","Tray Number"), sep = " ")
+
+#write an if else statement to make sprouted or not 0 or 1
+#sprouted-1
+#not sprouted-0
+sprout$sprouted<-ifelse(sprout$SproutDate=="NA",'0','1')
+
+#made not sprouted NA instead of 0, so changing NA to 0 in sprouted column
+sprout$sprouted[is.na(sprout$sprouted)]<-0
+
+sprout$SiteID<-gsub("STEER Basin", "STEER", sprout$SiteID)
+
+
+#filter the props by species
+LARA<-sprout%>%filter(Species=="LARA")
+AVGE<-sprout%>%filter(Species=="AVGE")
+
+
+#going to remove an outlier in AVGE (likely typo)
+AVGE<-AVGE%>%
+  filter(PropaguleLength!=0.40)
+#dont think these are actually outliers, i think they were measured in cm, convert to mm
+AVGE<-AVGE%>%
+  mutate(`Width-mm`=if_else(`Width-mm`<7, `Width-mm`*10, `Width-mm`))
+#more outliers (likely typos too)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.3)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.5)
+#AVGE<-AVGE%>%
+#  filter(`Width-mm`!=1.7)
+
+# i think these were likely accidentally measured in cm, going to convert to mm
+LARA<-LARA%>%
+  mutate(`Width-mm`=if_else(`Width-mm`<4, `Width-mm`*10, `Width-mm`))
+#LARA<-LARA%>%
+ # filter(`Width-mm`>=4)
+
+#changed my mind on this I don't think these are actually outliers leaving them in
+#LARA<-LARA%>%
+#  filter(`Width-mm`<=14)
+#LARA<-LARA%>%
+#  filter(Mass<=1.66)
+
+str(LARA)
+
+#sprouted as numeric
+AVGE$sprouted<-as.numeric(AVGE$sprouted)
+LARA$sprouted<-as.numeric(LARA$sprouted)
+
+#intake radicle length as numeric
+AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
+
+
+#sproutdate and intake date as dates
+sprout$SproutDate<-mdy(sprout$SproutDate)
+sprout$IntakeDate<-mdy(sprout$IntakeDate)
+```
+
+Plot intake char vs sprout/notsprout see if it looks like there are differences in intake char of those that sprouted or didn't sprout, makes Supplemental Figure 2
+```{r}
+library(ggforce)#geomsina
+library(patchwork)#putting plots together
+
+#look at AVGE
+
+AVGE$sprouted<-as.factor(AVGE$sprouted)
+
+meanlenght<-AVGE%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(PropaguleLength))
+
+sproutplot<-AVGE%>%
+  ggplot(aes(x=sprouted, y=PropaguleLength, color=sprouted))+
+  geom_violin()+
+  geom_sina()+
+  geom_boxplot(width=0.1)+
+  ylab("Length (cm)")+
+  xlab(" ")+
+  geom_point(data=meanlenght, aes(x=sprouted, y=mean), color="red")+
+   #ggtitle(expression(italic("A. germinans")~"Length"))+
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Sprouted", values = c("salmon4","darkgreen"))+#sets the colors manually of the dots, and outlines of violin plots
+  scale_x_discrete(labels=c("Did Not Sprout","Sprouted"))
+
+sproutplot
+
+
+meanradlenght<-AVGE%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(`IntakeRadicleLength-cm`))
+
+sproutplotRadL<-AVGE%>%
+  ggplot(aes(x=sprouted, y=`IntakeRadicleLength-cm`, color=sprouted))+
+  geom_violin()+
+  geom_sina()+
+  geom_boxplot(width=0.1)+
+  xlab(" ")+
+  ylab("Radicle Length (cm)")+
+  geom_point(data=meanradlenght, aes(x=sprouted, y=mean), color="red")+
+  #ggtitle(expression(italic("A. germinans")~"Radicle Length"))+
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Sprouted", values = c("salmon4","darkgreen"))+#sets the colors manually of the dots, and outlines of violin plots
+  scale_x_discrete(labels=c("Did Not Sprout","Sprouted"))
+
+sproutplotRadL
+
+
+#look for LARA
+
+LARA$sprouted<-as.factor(LARA$sprouted)
+
+meanmass<-LARA%>%
+  group_by(sprouted)%>%
+  summarise(mean=mean(Mass))
+
+sproutplotLARA<-LARA%>%
+  ggplot(aes(x=sprouted, y=Mass, color=sprouted))+
+  geom_violin()+
+   geom_sina()+
+  geom_boxplot(width=0.1)+
+  xlab(" ")+
+  ylab("Mass (g)")+
+  #ggtitle(expression(italic("L. racemosa")~"mass"))+
+  geom_point(data=meanmass, aes(x=sprouted, y=mean), color="red")+
+   theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Sprouted", values = c("salmon4","darkgreen"))+#sets the colors manually of the dots, and outlines of violin plots
+  scale_x_discrete(labels=c("Did Not Sprout","Sprouted"))
+
+sproutplotLARA
+
+TTestplot<-sproutplotLARA/sproutplotRadL/sproutplot
+TTestplot
+
+ggsave("Supplemental2.png",
+       plot = TTestplot,
+       width = 4.5,
+       height = 6,
+       units = "in",
+       dpi = 300)
+
+
+```
+
+Run a wilcoxon rank sum test checking For differences between props that sprouted and those that didn't
+
+```{r}
+library(rstatix)
+
+#Check Assumptions
+
+#LARA mass
+
+#shapiro normality
+shapiro.test(LARA$Mass)
+#Shapiro-Wilk normality test
+
+#data:  LARA$Mass
+#W = 0.9063, p-value = 4.136e-14
+
+hist(LARA$Mass)
+#nonparametric
+wilcox.test(Mass~sprouted, LARA)
+#Wilcoxon rank sum test with continuity correction
+
+#data:  Mass by sprouted
+#W = 11087, p-value = 0.06354
+#alternative hypothesis: true location shift is not equal to 0
+
+
+#AVGE radicle length
+shapiro.test(AVGE$`IntakeRadicleLength-cm`)
+wilcox.test(`IntakeRadicleLength-cm`~sprouted, AVGE)
+#Wilcoxon rank sum test with continuity correction
+
+#data:  IntakeRadicleLength-cm by sprouted
+#W = 11846, p-value = 0.7609
+#alternative hypothesis: true location shift is not equal to 0
+
+#AVGE length
+shapiro.test(AVGE$PropaguleLength)
+wilcox.test(PropaguleLength~sprouted, AVGE)
+
+#Wilcoxon rank sum test with continuity correction
+
+#data:  PropaguleLength by sprouted
+#W = 11593, p-value = 0.5473
+#alternative hypothesis: true location shift is not equal to 0
+
+
+```
+
+Look at propagule bouyancy across collection sites, and across treatments Makes Bouyancy Figure (Figure 2) and run Chi squred test A germinans comparing bouyancy across sites 
+
+```{r Float/No Float}
+#library(rcompanion)#posthoctest
+library(ggpattern)
+library(patchwork)
+
+#bouyancy compared across treatments
+
+#only six LARA props didn't float, so not enough sink to include as relevant, not visualizing
+summary_countsLARA <- LARA %>%
+  group_by(Treatment, Float) %>%
+  summarise(count = n(), .groups = "drop")
+#spread relatively evenly across treatments
+  
+
+#this is looking at the total number of props from each treatment that floated or not
+summary_countsAVGE <- AVGE %>%
+  group_by(Treatment, Float) %>%
+  summarise(count = n(), .groups = "drop")
+  
+  
+AVGEFbar1<-ggplot(data=summary_countsAVGE, aes(x=Treatment, y=count, fill=Float))+
+  geom_col(position="dodge")
+
+AVGEFbar1
+
+#they are looking semi evenish, enough that floated and sank in each treatment
+
+#Buoyancy compared across collection sites, info for table 2
+
+#LARA across sites
+siteLARA <- LARA %>%
+  group_by( SiteID, Float) %>%
+  summarise(count = n(), .groups = "drop")
+#spread semi evenly across sites
+
+
+
+#this is looking at the total number of AVGE props from each site that floated or not
+siteAVGE <- AVGE %>% 
+  group_by(SiteID, Float) %>% 
+  summarise(count = n(), .groups = "drop")
+  
+  #Visualize float or sink by site
+AVGEFbar1<-ggplot(data=siteAVGE, aes(x=SiteID, y=count, fill=Float))+
+  geom_col(position="dodge")
+
+AVGEFbar1
+
+#count of number that floated vs sank
+npropsAVGE<-c("n=87","n=31","n=82","n=38","n=30","n=89")
+
+#making a nice version of this plot, how many floated/sank from each site (this plot Figure 3)
+AVGEFbar1<-ggplot(data=siteAVGE, aes(x=SiteID, y=count, fill=Float))+
+  geom_col(position="dodge")+
+  #ggtitle(expression(italic("A. germinans") ~ "Propagule Bouyancy Test"))+
+   geom_text(aes(label = npropsAVGE),
+            position = position_dodge(width = 0.9),
+            vjust = -0.3,
+            size = 3.0) +
+  ylab("Propagule Count")+
+  xlab("Collection Site")+
+  scale_fill_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
+                    name = "Bouyancy", labels=c( "Did Not Float", "Floated"))+
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
+  
+
+AVGEFbar1
+
+#going to plot LARA
+
+siteLARA<-siteLARA%>%
+  filter(Float!="NA")
+
+npropsLARA<-c("n=1","n=119","n=1","n=119","n=4", "n=113")
+
+siteLARA$nprops <- npropsLARA
+
+LARAbar1<-ggplot(data=siteLARA, aes(x=SiteID, y=count, fill=Float))+
+  geom_col(position="dodge")+
+  #ggtitle(expression(italic("L. racemosa") ~ "Propagule Bouyancy Test"))+
+   geom_text(aes(label = nprops),
+            position = position_dodge(width = 0.9),
+            vjust = -0.3,
+            size = 3.0) +
+  ylab("Propagule Count")+
+  xlab("Collection Site")+
+  scale_fill_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
+                    name = "Bouyancy", labels=c( "Did Not Float", "Floated"))+
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
+
+LARAbar1
+
+#combine plots
+
+Float<-LARAbar1+AVGEFbar1+  plot_layout(guides = "collect")
+Float
+
+#save Bouyacy Figure
+ggsave("BouyancyFigure.png",
+       plot = Float,
+       width = 8,
+       height = 3.3,
+       units = "in",
+       dpi = 300)
+
+
+#more sink from compass and steer, more float from vessup salt pond going to test statistical difference with chi squared test
+
+#good chi square test reference
+
+#https://lukaswallrich.github.io/GoldCoreQuants/chi-squared-tests-for-associations-between-categorical-variables.html 
+
+chiframe<-siteAVGE%>%
+  pivot_wider(names_from = Float, values_from = count)
+
+chitest<-chisq.test(chiframe[,-1])
+chitest
+
+#	Pearson's Chi-squared test
+
+#data:  chiframe[, -1]
+#X-squared = 68.152, df = 2, p-value = 1.589e-15
+
+
+chitest$expected
+#making sure that the expected values aren't too low, if sample size is low, then you need to either correct the chi squared value or simulate more replicates, but we are good here
+
+chitest$residuals
+
+#              N         Y
+#[1,]  2.616951 -2.936930
+#[2,]  1.847395 -2.073279
+#[3,] -4.461073  5.006536
+
+```
+
+Lara Intake: Check for significant differences in mass, length, and width, across sites using a Kruskall Wallis Test
+
+```{r Compare LARA intake Variables Across Sites}
+library(FSA)#for DunnPost Hoc
+library(rcompanion)#for cldList function
+library(agricolae)#Tukey post hoc test
+
+#check for significant differences in LARA Mass between sites
+
+#check assumptions and try transformations
+bartlett.test(Mass~SiteID, LARA) #nope
+
+
+#no good, try transform
+
+LARA$MassSQ<-(LARA$Mass)^2
+bartlett.test(MassSQ~SiteID,LARA)#nope
+LARA$MassSR<-sqrt(LARA$Mass)
+bartlett.test(MassSR~SiteID, LARA)#nope
+LARA$logMass<-(log(LARA$Mass))
+bartlett.test(logMass~SiteID, LARA)#nope
+
+#check residuals
+
+LMaov<-aov(Mass~SiteID, LARA)
+#pull Resids
+aov_residuals <- residuals(LMaov)
+hist(aov_residuals)#skewed
+shapiro.test(aov_residuals)#<-1.645e-11
+#nope
+
+#nonparametric
+LARAMkw<-kruskal.test(Mass~SiteID, data=LARA)
+LARAMkw
+
+#	Kruskal-Wallis rank sum test
+
+#data:  Mass by SiteID
+#Kruskal-Wallis chi-squared = 101.11, df = 2, p-value < 2.2e-16
+
+#post hoc 
+
+LARAMkw
+
+#now we run post hoc analysis
+LARAMDunn=dunnTest(Mass ~ SiteID,
+  data = LARA)
+
+LARAMDunn
+
+Lab1 = LARAMDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#           Group Letter MonoLetter
+#1   CompassPoint      a         a 
+#2     STEERBasin      b          b
+#3 VessupSaltPond      c          c
+
+
+
+
+#compare length differences across sites
+
+
+#check assumptions and try transformations
+bartlett.test(PropaguleLength~SiteID, LARA) #nope
+#no good, try transform
+
+LARA$PropLentghtSQ<-(LARA$PropaguleLength)^2
+bartlett.test(PropLentghtSQ~SiteID,LARA)# nope
+LARA$PropaguleLengthSR<-sqrt(LARA$PropaguleLength)
+bartlett.test(PropaguleLengthSR~SiteID,LARA)#nope
+
+#check residuals
+
+LLaov<-aov(PropaguleLength~SiteID, LARA)
+#pull Resids
+aov_residuals <- residuals(LLaov)
+hist(aov_residuals)#skewed
+shapiro.test(aov_residuals)#<- 0.0002137
+#nope
+
+#nonparametric
+LARALkw<-kruskal.test(PropaguleLength~SiteID, data=LARA)
+LARALkw
+
+#	Kruskal-Wallis rank sum test
+
+#data:  PropaguleLength by SiteID
+#Kruskal-Wallis chi-squared = 106.92, df = 2, p-value < 2.2e-16
+
+
+#post hoc test
+LARALDunn=dunnTest(PropaguleLength ~ SiteID,
+  data = LARA)
+
+LARALDunn
+
+#letters
+Lab1 = LARALDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#           Group Letter MonoLetter
+#1   CompassPoint      a        a  
+#2     STEERBasin      b         b 
+#3 VessupSaltPond      c          c
+
+
+
+#Width is next!
+
+#check assumptions and try transformations
+bartlett.test(`Width-mm`~SiteID, LARA) #yes!
+
+#no good, try transform
+LARA$WSQ<-(LARA$`Width-mm`)^2
+bartlett.test(WSQ~SiteID,LARA)#nope
+LARA$WSR<-sqrt(LARA$Mass)
+bartlett.test(WSR~SiteID, LARA)#nope
+
+#check residuals
+
+LWaov<-aov(`Width-mm`~SiteID, LARA)
+#pull Resids
+aov_residuals <- residuals(LWaov)
+hist(aov_residuals)#skewed
+shapiro.test(aov_residuals)#<- 2.919e-08
+#nope
+
+#nonparametric
+LARAWkw<-kruskal.test(`Width-mm`~SiteID, data=LARA)
+LARAWkw
+
+#	Kruskal-Wallis rank sum test
+
+#data:  Width-mm by SiteID
+#Kruskal-Wallis chi-squared =  27.246, df = 2, p-value = 1.212e-06
+
+
+LARAWDunn=dunnTest(`Width-mm` ~ SiteID,
+  data = LARA)
+
+LARAWDunn
+
+Lab1 = LARAWDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#           Group Letter MonoLetter
+#1   CompassPoint      a         a 
+#2     STEERBasin      b          b
+#3 VessupSaltPond      b          b
+
+```
+
+
+Check for significant differences in A germinans mass, length, width, and radicle lenght  across sites Kruskall Wallis Test 
+
+```{r Compare AVGE intake Variables Across Sites}
+
+#check for significant differences in AVGE Mass between sites
+
+#check assumptions and try transformations
+bartlett.test(Mass~SiteID, AVGE) #p= 1.519e-05
+
+#no good, try transform
+
+AVGE$MassSQ<-(AVGE$Mass)^2
+bartlett.test(MassSQ~SiteID,AVGE)#nope
+AVGE$MassSR<-sqrt(AVGE$Mass)
+bartlett.test(MassSR~SiteID, AVGE)#= 0.005135
+#no good 
+
+
+#check residuals
+
+AMaov<-aov(Mass~SiteID, AVGE)
+#pull Resids
+aov_residuals <- residuals(AMaov)
+hist(aov_residuals)#skewed
+shapiro.test(aov_residuals)#<-0.0005958
+
+
+#nonparametric
+AVGEMkw<-kruskal.test(Mass~SiteID, data=AVGE)
+AVGEMkw
+
+#			Kruskal-Wallis rank sum test
+
+#data:  Mass by SiteID
+#Kruskal-Wallis chi-squared = 23.163, df = 2, p-value = 9.335e-06
+
+#post hoc 
+
+#now we run post hoc analysis
+AVGEMDunn=dunnTest(Mass ~ SiteID,
+  data = AVGE)
+
+AVGEMDunn
+
+#interpret the results of Dunn and turn into letters of significant difference
+Lab1 = AVGEMDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#               Group Letter MonoLetter
+#1   CompassPoint      a         a 
+#2     STEERBasin      b          b
+#3 VessupSaltPond      a         a 
+
+
+
+
+#compare length differences across sites
+
+#check assumptions and try transformations
+bartlett.test(PropaguleLength~SiteID, AVGE) #p=0.006868
+#transform
+
+AVGE$PropLentghtSQ<-(AVGE$PropaguleLength)^2
+bartlett.test(PropLentghtSQ~SiteID,AVGE)# 0.0007166
+#NOPE
+AVGE$PropLengthSR<-(sqrt(AVGE$PropaguleLength))
+bartlett.test(PropLengthSR~SiteID,AVGE)# 0.01596
+#nope, nonparametric
+
+#check Residuals
+
+ALaov<-aov(PropaguleLength~SiteID, AVGE)
+#pull Resids
+aov_residuals <- residuals(ALaov)
+hist(aov_residuals)#skewed
+shapiro.test(aov_residuals)#<-0.04013
+
+#nonparametric
+AVGELkw<-kruskal.test(PropaguleLength~SiteID, data=AVGE)
+AVGELkw
+
+#	Kruskal-Wallis rank sum test
+
+#data:  PropaguleLength by SiteID
+#Kruskal-Wallis chi-squared = 9.3863, df = 2, p-value = 0.009158
+
+#post hoc
+AVGELDunn=dunnTest(PropaguleLength ~ SiteID,
+  data = AVGE)
+
+AVGELDunn
+
+Lab1 = AVGELDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#           Group Letter MonoLetter
+#1   CompassPoint      a         a 
+#2     STEERBasin      b          b
+#3 VessupSaltPond     a        a
+
+#Width is next!
+
+#check assumptions and try transformations
+bartlett.test(`Width-mm`~SiteID, AVGE) #p=0.09896
+
+#check residuals
+WAOV<-aov(`Width-mm`~SiteID, AVGE)
+plot(WAOV)
+
+hist(WAOV$residuals)
+shapiro.test(WAOV$residuals)#0.009788
+#nonparametric
+
+AVGEWKW<-kruskal.test(`Width-mm`~SiteID, AVGE)
+AVGEWKW
+
+#Kruskal-Wallis rank sum test
+
+#data:  Width-mm by SiteID
+#Kruskal-Wallis chi-squared = 19.69, df = 2, p-value = 5.302e-05
+
+#post hoc
+AVGEWDunn=dunnTest(`Width-mm` ~ SiteID,
+  data = AVGE)
+
+AVGEWDunn
+
+Lab1 = AVGEWDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#           Group Letter MonoLetter
+#1   CompassPoint      a         a 
+#2     STEERBasin      b          b
+#3 VessupSaltPond      a         a 
+
+#now look at radical length at intake
+
+AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
+
+#check assumptions and try transformations
+bartlett.test(`IntakeRadicleLength-cm`~SiteID, AVGE) #p=0.2843
+#run ANOVA
+ARLaov<-aov(`IntakeRadicleLength-cm`~SiteID, AVGE)
+#pull Resids
+aov_residuals <- residuals(ARLaov)
+hist(aov_residuals)#skewed
+shapiro.test(aov_residuals)#< 2.2e-16
+#transform
+
+AVGE$RadLSQ<-(AVGE$`IntakeRadicleLength-cm`)^2
+bartlett.test(RadLSQ~SiteID,AVGE)#0.007824
+#NOPE
+AVGE$RadlSR<-(sqrt(AVGE$`IntakeRadicleLength-cm`))
+bartlett.test(RadlSR~SiteID,AVGE)#0.9842
+
+RadLSRaov<-aov(RadlSR~SiteID, AVGE)
+aov_residuals <- residuals(RadLSRaov)
+hist(aov_residuals)
+shapiro.test(aov_residuals)#nope, nonparametric
+
+AVGERadLkw<-kruskal.test(`IntakeRadicleLength-cm`~SiteID, data=AVGE)
+AVGERadLkw
+
+#	Kruskal-Wallis rank sum test
+
+#data:  IntakeRadicleLength-cm by SiteID
+#Kruskal-Wallis chi-squared = 25.405, df = 2, p-value = 3.043e-06
+
+#post hoc 
+
+
+AVGERadLDunn=dunnTest(`IntakeRadicleLength-cm` ~ SiteID,
+  data = AVGE)
+
+AVGERadLDunn
+
+
+Lab1 = AVGERadLDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#           Group Letter MonoLetter
+#1   CompassPoint      a         a 
+#2     STEERBasin      a         a 
+#3 VessupSaltPond      b          b
+
+```
+
+Visualize size differences by species and collection site
+
+Visualizing propagule characteristics determining differences between sites, showing outputs of kw tests Figure 3
+
+```{r Site Visualizations Sinaplots}
+library(tidyverse)
+library(patchwork)
+library(ggforce)#for sinaplots
+
+
+#making some violin plots, including a sina plot inside better representations of the distribution of the data
+
+#link talking about what sinaplots are and why to use them
+#https://datavizpyr.com/sinaplot-vs-violin-plot-why-sinaplot-is-better-than-violinplot/
+
+#first, get a version of the plot that you like, making example plot LARA mass
+
+#making these title objects so I can italisize the sp name in the titles
+title1<-expression(italic("L. racemosa")~"Seed Mass")
+
+testplot<-LARA%>%
+  ggplot(aes(x=SiteID, y=Mass, color=SiteID))+#setting my x and y values, 
+  geom_violin()+#makes the plot that follows shape of the data
+    geom_sina(alpha=0.5)+#adds all the dots to the violin plot needs ggforce library
+    geom_boxplot(width=0.1, color="black", alpha=0.5)+
+  ggtitle(title1)+
+  ylab("Mass (g)")+
+  xlab("Collection Site")+
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Site", values = c("darkgreen","salmon4", "olivedrab"))#sets the colors manually of the dots, and outlines of violin plots
+
+#testplot doesnt include the lettering added in function
+  
+
+testplot
+
+#then you can turn the plot into a function to make all of the plots for each combo of species and lenght, width, mass without copying and pasting the code a million times. Also if a change needs to be made to teh plot you can just modify the function and rerun the code
+
+
+
+
+#SPECIES:This is the cleaned dataframe I have filtered the dataframes so there is only one species in each dataframe
+#YVal: response variable
+#title: "put title you want in quotes"
+#ylab: "put ylab you want in quotes"
+#CP: letter above compass point from KW/Dunn post hoc
+#SB: Letter above salt river from KW/Dunn post hoc
+#VSP: letter above VSPfrom KW/Dunn post hoc
+#Yplace: number of units above the max y value you want to put your letters
+
+PropViolinPlot<-function(SPECIES,YVal, title, ylab, CP, SB, VSP,Yplace){SPECIES%>%
+  ggplot(aes(x=SiteID, y=YVal, color=SiteID))+#setting my x and y values, 
+  geom_violin()+#makes the plot that follows shape of the data
+    geom_sina(alpha=0.3)+#adds all the dots to the violin plot needs ggforce library
+    geom_boxplot(width=0.1, color="black", alpha=0.5)+
+  ggtitle(title)+
+  ylab(ylab)+
+  xlab("Collection Site")+
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Site", values = c("darkgreen","salmon4", "olivedrab"))+#sets the colors manually of the dots, and outlines of violin plots
+  geom_text(aes(family="serif", fontface="plain"),size=6,x= "Compass Point" , y=Yplace, label=CP, colour="black")+#add first letter, family and fontface change font and remove bold
+  geom_text(aes(family="serif", fontface="plain"),size=6,x= "STEER" , y=Yplace, label=SB, colour="black")+#add second letter
+  geom_text(aes(family="serif", fontface="plain"),size=6, x= "Vessup Salt Pond" , y=Yplace, label=VSP, colour="black")}#third letter 
+
+
+#replotting everything with violin plots stacked with boxplots
+
+#making these title objects so I can italisize the sp name in the titles
+title1<-expression(italic("L. racemosa")~"Seed Mass")
+title2<-expression(italic("A. germinans")~"Propagule Mass")
+title3<-expression(italic("L. racemosa")~"Seed Length")
+title4<-expression(italic("A. germinans")~"Propagule Length")
+title5<-expression(italic("L. racemosa")~"Seed Width")
+title6<-expression(italic("A. germinans")~"Propagule Width")
+title7<-expression(italic("A. germinans")~"Radicle Length")
+
+
+#plot LARA mass
+VLARAmass<-PropViolinPlot(LARA, LARA$Mass, title1, "Mass (g)", "a","b","c", 2)
+
+#set the y limits
+VLARAmass<-VLARAmass+ylim(0,2)
+
+VLARAmass
+
+#plot AVGE mass
+VAVGEmass<-PropViolinPlot(AVGE, AVGE$Mass, title2, "Mass (g)", "a", "b","a", 3.7)
+VAVGEmass<-VAVGEmass+ylim(0,4)
+VAVGEmass
+
+#plot LARA length
+VLARAlength<-PropViolinPlot(LARA, LARA$PropaguleLength, title3, "Length (cm)", "a", "b","c", 3.5)
+
+VLARAlength<-VLARAlength+ylim(1,3.5)
+VLARAlength
+
+#plot AVGE length
+VAVGElength<-PropViolinPlot(AVGE, AVGE$PropaguleLength, title4, "Length (cm)", "a", "b","a", 3.3)
+
+VAVGElength<-VAVGElength+ylim(0,3.3)
+VAVGElength
+
+#LARA Width
+VLARAwidth<-PropViolinPlot(LARA, LARA$`Width-mm`, title5, "Width (mm)", "a", "b","b", 22)
+
+VLARAwidth<-VLARAwidth+ylim(0,22)
+VLARAwidth
+
+#AVGE width
+VAVGEwidth<-PropViolinPlot(AVGE, AVGE$`Width-mm`, title6, "Width (mm)", "a", "b","a", 25)
+
+VAVGEwidth<-VAVGEwidth+ylim(0,25)
+VAVGEwidth
+
+#AVGE rad length
+AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
+VAVGEradlength<-PropViolinPlot(AVGE, AVGE$`IntakeRadicleLength-cm`, title7, " Radicle Length (cm)", "a", "a","b", 1.65)
+
+VAVGEradlength<-VAVGEradlength+ylim(0,1.65)
+VAVGEradlength
+
+#combining plots with patchwork
+
+CharPlot<-(VLARAlength|VAVGElength)/(VLARAwidth|VAVGEwidth)/(VLARAmass|VAVGEmass)/ (plot_spacer()|VAVGEradlength)
+
+CharPlot
+
+#exporing plot with ggsave, ensures it is always the same size, outputs into project file
+ggsave(
+  filename = "IntakeCharPlot1.jpg",  # output file name
+  plot = CharPlot,            # your ggplot object
+  width = 3000,                      # width in pixels
+  height = 3200,                     # height in pixels
+  units = "px",                      # set units to pixels
+  dpi = 300                          # resolution
+)
+
+```
+
+Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted
+Running all combonations of AVGE logistic regressions, the reason I do this is to make sure I select the correct explanatory variables in the model, so i need to run all combinations of the non correlated variables. Then I look at the AIC value at the bottom. AIC looks at model fit and penalizes for complexity (more variables included), the model with the lower AICs are better 
+
+
+```{r}
+#treatment only
+Basic1<-glm(sprouted~Treatment, data=AVGE, family="binomial")
+summary(Basic1)
+#189.63
+
+#treatment&siteID
+Basic<-glm(sprouted~Treatment+SiteID, data=AVGE, family="binomial")
+summary(Basic)
+#191.5
+
+#Treatment/Site/Length
+TSL<-glm(sprouted~Treatment+SiteID+PropaguleLength, data=AVGE, family="binomial")
+summary(TSL)
+#191.71
+
+#Treatment/Site/Length/Rad
+TSLR<-TSL<-glm(sprouted~Treatment+SiteID+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSLR)
+#190.68
+
+#Treatment/Site/Width
+TSW<-glm(sprouted~Treatment+SiteID+`Width-mm`, data=AVGE, family="binomial")
+summary(TSW)
+#193.22
+
+#Treatment/Site/Width/IntakeRadicleLength
+TSWR<-TSW<-glm(sprouted~Treatment+SiteID+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSWR)
+#191.81
+
+#Treatment/Site/Mass
+TSM<-glm(sprouted~Treatment+SiteID+Mass, data=AVGE, family="binomial")
+summary(TSM)
+#193.49
+
+#Treatment/Site/Mass/Intake Radicle Length
+TSMR<-glm(sprouted~Treatment+SiteID+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSMR)
+#192.13
+
+#Treatment/Site/IntakeRadLength
+TSR<-TSM<-glm(sprouted~Treatment+SiteID+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(TSR)
+#190.13
+
+#Treatment&Float
+Basic3<-glm(sprouted~Treatment+Float, data=AVGE, family="binomial")
+summary(Basic3)
+#189.23
+
+#Treatment/Float/RadLength
+Basic3R<-glm(sprouted~Treatment+Float+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(Basic3R)
+#187.22
+
+#lenght
+BasicL<-glm(sprouted~Treatment+PropaguleLength, data=AVGE, family="binomial")
+summary(BasicL)
+#190.39
+
+#Treatment/Length/RadL
+BasicLR<-glm(sprouted~Treatment+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicLR)
+#189.96
+
+#width
+BasicW<-glm(sprouted~Treatment+`Width-mm`, data=AVGE, family="binomial")
+summary(BasicW)
+#190.98
+
+#width/RadL
+BasicWR<-glm(sprouted~Treatment+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicWR)
+#190.24
+
+#mass
+BasicM<-glm(sprouted~Treatment+Mass, data=AVGE, family="binomial")
+summary(BasicM)
+#191.62
+
+#mass/RadL
+BasicMR<-glm(sprouted~Treatment+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicMR)
+#190.95
+
+#float length
+#exclude site not significant (Best Model!)
+NoSLengthLogit<-glm(sprouted~Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
+summary(NoSLengthLogit)
+
+
+#Call:
+#glm(formula = sprouted ~ Float + Treatment + PropaguleLength, 
+#    family = "binomial", data = AVGE)
+
+#Coefficients:
+#                Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)      -0.1487     1.2331  -0.121    0.904    
+#FloatY            0.8115     0.4380   1.852    0.064 .  
+#TreatmentFresh    6.3498     1.0617   5.981 2.22e-09 ***
+#TreatmentSalt     5.8099     0.8119   7.156 8.31e-13 ***
+#TreatmentSoil     3.5559     0.4419   8.046 8.53e-16 ***
+#PropaguleLength  -0.8830     0.5679  -1.555    0.120    
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 405.31  on 356  degrees of freedom
+#Residual deviance: 176.76  on 351  degrees of freedom
+#AIC: 188.76
+
+#Number of Fisher Scoring iterations: 7
+
+#exponentiating the coefficients of the best fit model so i can understand their effect more directly
+exp(coef(NoSLengthLogit))
+
+#   (Intercept)          FloatY  TreatmentFresh   TreatmentSalt   TreatmentSoil PropaguleLength 
+#      0.8617965       2.2511855     572.3962404     333.5957369      35.0179225       0.4135561
+
+#testing assumptions of bestfit model
+qqnorm(residuals(NoSLengthLogit, type = "pearson"))
+
+
+#Treatment/Float/Length/RadL
+NoSLengthLogitR<-glm(sprouted~Float+Treatment+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(NoSLengthLogitR)
+
+#Call:
+#glm(formula = sprouted ~ Float + Treatment + PropaguleLength + 
+#    `IntakeRadicleLength-cm`, family = "binomial", data = AVGE)
+
+#Coefficients:
+#                         Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)              -0.06525    1.27717  -0.051   0.9593    
+#FloatY                    0.95352    0.44326   2.151   0.0315 *  
+#TreatmentFresh            6.68696    1.09681   6.097 1.08e-09 ***
+#TreatmentSalt             5.89867    0.81445   7.243 4.40e-13 ***
+#TreatmentSoil             4.03852    0.53502   7.548 4.41e-14 ***
+#PropaguleLength          -0.85591    0.58630  -1.460   0.1443    
+#`IntakeRadicleLength-cm` -1.11676    0.57981  -1.926   0.0541 .  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 405.31  on 356  degrees of freedom
+#Residual deviance: 173.05  on 350  degrees of freedom
+#AIC: 187.05
+
+#Number of Fisher Scoring iterations: 7
+
+#exponentiating the coefficients of the best fit model so i can understand their effect more directly
+exp(coef(NoSLengthLogitR))
+
+ #        (Intercept)                   FloatY           TreatmentFresh            TreatmentSalt 
+#               0.9368332                2.5948145              801.8810915              364.5513044 
+#           TreatmentSoil          PropaguleLength `IntakeRadicleLength-cm` 
+#              56.7421217                0.4248974                0.3273375 
+
+#pull coefficients so I can calculated 95% CI
+coef<-coef(NoSLengthLogitR)
+
+#pull out the standard error so i can caluculate 95% confidence interval
+se   <- summary(NoSLengthLogitR)$coefficients[, "Std. Error"]
+
+#calculate lower and upper CI
+LCL <- exp(coef - 1.96 * se)
+LCL
+#            (Intercept)                   FloatY           TreatmentFresh 
+#              0.07665016               1.08841885              93.43039728 
+#           TreatmentSalt            TreatmentSoil          PropaguleLength 
+ #            73.87284548              19.88314317               0.13465392 
+#`IntakeRadicleLength-cm` 
+#              0.10506264 
+UCL <- exp(coef + 1.96 * se)
+UCL
+#(Intercept)                   FloatY           TreatmentFresh 
+#               11.450156                 6.186095              6882.270691 
+#           TreatmentSalt            TreatmentSoil          PropaguleLength 
+#             1799.005476               161.929547                 1.340754
+#`IntakeRadicleLength-cm` 
+#                1.019866 
+
+
+#float, width
+NoSWidthLogit<-glm(sprouted~Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
+summary(NoSWidthLogit)
+#191.01
+
+#float, width, radR
+NoSWidthLogitR<-glm(sprouted~Float+Treatment+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(NoSWidthLogitR)
+#188.99
+
+#flaotmass
+NoSMassLogit<-glm(sprouted~Float+Treatment+Mass, data=AVGE, family="binomial")
+summary(NoSMassLogit)
+#191.21
+
+#Float/Mass/RadL
+NoSMassLogitR<-glm(sprouted~Float+Treatment+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(NoSMassLogitR)
+#189.21
+
+#site/float
+BasicLogit<-glm(sprouted~SiteID+Float+Treatment, data=AVGE, family="binomial")
+summary(BasicLogit)
+#191.5
+
+#site/float/RadL
+BasicLogitR<-glm(sprouted~SiteID+Float+Treatment+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(BasicLogitR)
+#189.36
+
+
+#site/float/length
+
+LengthLogit<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength, data=AVGE, family="binomial")
+summary(LengthLogit)
+#190.33
+
+#site/float/length/radL
+LengthLogitR<-glm(sprouted~SiteID+Float+Treatment+PropaguleLength+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(LengthLogitR)
+#188.7
+
+#site/Float/width
+WidthLogit<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`, data=AVGE, family="binomial")
+summary(WidthLogit)
+#193.47
+
+#site/float/width/radL
+WidthLogitR<-glm(sprouted~SiteID+Float+Treatment+`Width-mm`+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(WidthLogitR)
+#191.31
+
+#site/Float/Mass
+masslogit<-glm(sprouted~SiteID+Float+Treatment+Mass, data=AVGE, family="binomial")
+summary(masslogit)
+#193.34
+
+#site/float/mass/radlength
+masslogitR<-glm(sprouted~SiteID+Float+Treatment+Mass+`IntakeRadicleLength-cm`, data=AVGE, family="binomial")
+summary(masslogitR)
+#191.3
+```
+
+
+Visualized AVGE in two ways one just holding radL and L constant and generating results for float and not float, the other varying intake RL across observed values
+
+Making a figure predicting sprouting using the best model generated for AVGE
+```{r AVGE logit Figure}
+#here I am creating a new dataframe to hold the predicted values, I am keeping length constant at the mean length value, and radicle length constant also, so predicted values only reflect treatment and buoyancy, expand.grid creates all combos of supplied vectors (my float and treatment vectors) keeping propagule and radicle length constant at the mean
+AVGEpredict<- expand.grid(
+  Float = c("Y", "N"), #two bouyancy options
+  Treatment = c("Fresh", "Salt", "Soil", "Air"), #four treatment options
+  PropaguleLength = mean(AVGE$PropaguleLength),
+  `IntakeRadicleLength-cm`   = mean(AVGE$`IntakeRadicleLength-cm`))  # hold length constant
+
+
+# we are generating data for each treatment using the model created from our experimental data here, predict(mylogitmodel, newdf, type=return linear predictor log odds, not translate to probablitiles, also give SE)
+AVGEpredict1 <- predict(NoSLengthLogitR, AVGEpredict, type = "link", se.fit = TRUE)
+
+#now i have the log odds for each treatment bouyancy combo and standard errors, need to convert to probabilites
+
+# Convert from log-odds to probability 𝑥x to probability 𝑝=1/(1+𝑒−𝑥)p=1/(1+e−x) for probabilites and confidence intervals (combines estimate, uncertianty (SE), and confidence level)
+AVGEpredict$prob <- plogis(AVGEpredict1$fit)  # predicted probability
+AVGEpredict$lower <- plogis(AVGEpredict1$fit - 1.96 * AVGEpredict1$se.fit)  # lower 95% CI
+AVGEpredict$upper <- plogis(AVGEpredict1$fit + 1.96 * AVGEpredict1$se.fit)  # upper 95% CI
+
+
+#plot predicted
+AVGElogitplot<-ggplot(AVGEpredict, aes(x = Treatment, y = prob, color = Float)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2,
+                position = position_dodge(width = 0.5)) +
+  coord_cartesian(ylim = c(0,1)) +
+  labs(y = "Predicted sprouting probability",
+       x = "Treatment",
+       color = "Float")+
+  ggtitle(expression(italic("A. germinans")~"Predicted Sprouting Probability"))+
+   scale_color_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
+                    name = "Bouyancy", labels=c( "Floated", "Did Not Float"))+
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
+  scale_x_discrete(labels = c(
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil",
+  "Air"="No Substrate"
+))
+
+AVGElogitplot
+
+```
+
+
+rerunning all combinations of LARA logistic regression, not including bouyancy for this one because not enough representation of sinking across groups (only 6 sank)
+
+```{r LARA logit}
+#treatment only
+Basic1<-glm(sprouted~Treatment, data=LARA, family="binomial")
+summary(Basic1)
+#297.15
+
+#treatment&siteID
+Basic<-glm(sprouted~Treatment+SiteID, data=LARA, family="binomial")
+summary(Basic)
+#300.39
+
+#Treatment/Site/Length
+TSL<-glm(sprouted~Treatment+SiteID+PropaguleLength, data=LARA, family="binomial")
+summary(TSL)
+#297.62
+
+#Treatment/Site/Width
+TSW<-glm(sprouted~Treatment+SiteID+`Width-mm`, data=LARA, family="binomial")
+summary(TSW)
+#298.65
+
+#Treatment/Site/Mass
+TSM<-glm(sprouted~Treatment+SiteID+Mass, data=LARA, family="binomial")
+summary(TSM)
+
+#Call:
+#glm(formula = sprouted ~ Treatment + SiteID + Mass, family = "binomial", 
+#    data = LARA)
+
+#Coefficients:
+#                       Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)             -3.0511     0.8323  -3.666 0.000247 ***
+#TreatmentFresh           3.8565     0.5289   7.292 3.06e-13 ***
+#TreatmentSalt            3.6908     0.5207   7.088 1.36e-12 ***
+#TreatmentSoil            2.1294     0.3574   5.959 2.54e-09 ***
+#SiteIDSTEER              0.8123     0.4289   1.894 0.058257 .  
+#SiteIDVessup Salt Pond   0.3442     0.3985   0.864 0.387631    
+#Mass                     3.1388     1.1283   2.782 0.005403 ** 
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 418.92  on 358  degrees of freedom
+#Residual deviance: 279.85  on 352  degrees of freedom
+#AIC: 293.85
+
+#Number of Fisher Scoring iterations: 5
+
+
+#going to check with interaction between mass and site, want to double check there is enough replication for an interaction term
+
+
+#pull coefficients so I can calculated 95% CI
+coef<-coef(TSM)
+
+exp(coef(TSM))
+#    (Intercept)         TreatmentFresh          TreatmentSalt 
+#            0.04730836            47.29806010            40.07781792 
+#         TreatmentSoil            SiteIDSTEER SiteIDVessup Salt Pond 
+#            8.40998224             2.25312227             1.41091922 
+#                  Mass 
+#           23.07524820 
+
+#pull out the standard error so i can caluculate 95% confidence interval
+se   <- summary(TSM)$coefficients[, "Std. Error"]
+
+#calculate lower and upper CI
+LCL <- exp(coef - 1.96 * se)
+LCL
+#  (Intercept)         TreatmentFresh          TreatmentSalt 
+#           0.009256446           16.774622485           14.444003898 
+#         TreatmentSoil            SiteIDSTEER SiteIDVessup Salt Pond 
+#           4.174501747            0.971986623            0.646134121 
+#                  Mass 
+#           2.527881415 
+UCL <- exp(coef + 1.96 * se)
+UCL
+#(Intercept)         TreatmentFresh          TreatmentSalt 
+#             0.2417862            133.3625536            111.2040332 
+#         TreatmentSoil            SiteIDSTEER SiteIDVessup Salt Pond 
+#            16.9428127              5.2228702              3.0809285 
+#                  Mass 
+#           210.6376811
+
+
+LARAcheck<-LARA%>%
+  group_by(SiteID, Treatment)%>%
+  summarise(N=n())
+
+TSMI<-glm(sprouted~Treatment+SiteID+Mass+SiteID*Mass, data=LARA, family="binomial")
+summary(TSMI)
+
+#Call:
+#glm(formula = sprouted ~ Treatment + SiteID + Mass + SiteID *Mass, family = "binomial", data = LARA)
+
+#Coefficients:
+#                            Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)                  -2.2935     1.0273  -2.233   0.0256 *  
+#TreatmentFresh                3.9112     0.5372   7.280 3.33e-13 ***
+#TreatmentSalt                 3.7692     0.5254   7.173 7.32e-13 ***
+#TreatmentSoil                 2.1548     0.3587   6.007 1.89e-09 ***
+#SiteIDSTEER                   1.0305     1.7026   0.605   0.5450    
+#SiteIDVessup Salt Pond       -1.5905     1.3227  -1.202   0.2292    
+#Mass                          1.9162     1.4682   1.305   0.1918    
+#SiteIDSTEER:Mass             -0.9732     3.3305  -0.292   0.7701    
+#SiteIDVessup Salt Pond:Mass   3.5699     2.2929   1.557   0.1195    
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 418.92  on 358  degrees of freedom
+#Residual deviance: 276.90  on 350  degrees of freedom
+#AIC: 294.9
+
+#Number of Fisher Scoring iterations: 5
+
+#Treatment&Float
+Basic3<-glm(sprouted~Treatment+Float, data=LARA, family="binomial")
+summary(Basic3)
+#290.29
+
+#lenght
+BasicL<-glm(sprouted~Treatment+PropaguleLength, data=LARA, family="binomial")
+summary(BasicL)
+#296.49
+
+#width
+BasicW<-glm(sprouted~Treatment+`Width-mm`, data=LARA, family="binomial")
+summary(BasicW)
+# 295.83
+
+#mass
+BasicM<-glm(sprouted~Treatment+Mass, data=LARA, family="binomial")
+summary(BasicM)
+
+#Call:
+#glm(formula = sprouted ~ Treatment + Mass, family = "binomial", 
+#    data = LARA)
+
+#Coefficients:
+#               Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)     -2.1058     0.6003  -3.508 0.000452 ***
+#TreatmentFresh   3.7935     0.5222   7.264 3.75e-13 ***
+#TreatmentSalt    3.6962     0.5189   7.122 1.06e-12 ***
+#TreatmentSoil    2.0476     0.3494   5.860 4.64e-09 ***
+#Mass             2.1533     0.9602   2.243 0.024924 *  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#    Null deviance: 418.92  on 358  degrees of freedom
+#Residual deviance: 283.63  on 354  degrees of freedom
+#AIC: 293.63
+
+#Number of Fisher Scoring iterations: 5
+
+
+```
+
+What does it look like if i hold mass constant and have site and treatment?
+
+```{r}
+
+LARApredict1<- expand.grid(
+  Treatment = c("Fresh", "Salt", "Soil", "Air"),#four treatment options
+  SiteID= c("Vessup Salt Pond", "STEER", "Compass Point"),
+  Mass = mean(LARA$Mass))  #mass across values
+
+# Predict values using my model, on link scale with standard errors calculated for each value
+pred <- predict(TSM, newdata = LARApredict1, type = "link", se.fit = TRUE)
+
+# Add fit and SE generated by predict to LARApredict df
+LARApredict1$fit <- pred$fit
+LARApredict1$se <- pred$se.fit
+
+# these were calculated on the log scale, which is how results are presented in logit, converting to probability scale (using plogis) for plotting both predicted values and 95% (1.96)confidence intervals
+LARApredict1$lower <- plogis(LARApredict1$fit - 1.96 * LARApredict1$se)
+LARApredict1$upper <- plogis(LARApredict1$fit + 1.96 * LARApredict1$se)
+LARApredict1$pred_prob <- plogis(LARApredict1$fit)
+
+
+LARAlogitplot<-ggplot(LARApredict1, aes(x = Treatment, y = pred_prob, color = SiteID)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2,
+                position = position_dodge(width = 0.5)) +
+  coord_cartesian(ylim = c(0,1)) +
+  labs(y = "Predicted sprouting probability",
+       x = "Treatment",
+       color = "SiteID")+
+  ggtitle(expression(italic("L. racemosa")~"Predicted Sprouting Probability"))+
+   scale_color_manual(values = c("Vessup Salt Pond" = "olivedrab", "STEER" = "salmon4","Compass Point"="darkgreen"),
+                    name = "Site ID", labels=c( "Vessup Salt Pond", "STEER","Compass Point"))+
+  theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
+  scale_x_discrete(labels = c(
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil",
+  "Air"="No Substrate"
+))
+   
+   LARAlogitplot
+   
+ #i like the plots holding mass and radicle lenght constant
+   
+finallogitplots<-LARAlogitplot+AVGElogitplot
+finallogitplots
+
+```
+Calculating proportion sprouted on each day for plotting, visualized in different ways
+```{r Determine Percent Germinated}
+library(lubridate)
+
+#rename dataframe for manipulation
+GermSprout<-sprout
+
+#select for the columns I want to keep 
+GermSprout<-GermSprout%>%
+  select(Species, SiteID, Treatment, CollectionDate, IntakeDate, SproutDate, sprouted, `RadicleLenthAtPlant-cm`, Mass, PropaguleLength, `Width-mm`, Float)
+
+#subtracting sprout date from intake date to get duration until sprouting
+GermSprout$DaysUntilSprout<-(GermSprout$SproutDate-GermSprout$IntakeDate)
+
+#replacing nas with zeros, zeros mean that the seeds never sprouted
+GermSprout$DaysUntilSprout[is.na(GermSprout$DaysUntilSprout)] <- 0
+
+#add a column named Day that is all 1s, so I can sum the number 
+GermSprout<-GermSprout%>%mutate(Day=1)
+
+#grouping by species treatment and site ID, and days until sprout, then summing together all the 1s in the day column so I can see how many sprouted on each of the days until sprouting
+GermSproutCount<-GermSprout%>%
+  group_by(Species, Treatment, SiteID,DaysUntilSprout)%>%
+  summarise(sum(Day))
+
+#note can also do this by using the funciton n, it will tell you how many values in each group
+GermSproutCount1<-GermSprout%>%
+  group_by(Species, Treatment, SiteID,DaysUntilSprout)%>%
+  summarise(N=n())
+
+#change the class of the resulting object and columns
+GermSproutCount<-as.data.frame(GermSproutCount)
+
+#pivoting wider, have the days across the top and the number sprouted that day as values
+GermSproutCount<-GermSproutCount%>%
+  pivot_wider(names_from =DaysUntilSprout, values_from=`sum(Day)`)
+
+#filling in blanks with zeros
+GermSproutCount[is.na(GermSproutCount)]<-0
+
+#rename columns instead of #s, when they are numbers It will not let me call them 
+colnames(GermSproutCount)[4]<-"DidNotSprout"
+colnames(GermSproutCount)[5]<-"Day_8"
+colnames(GermSproutCount)[6]<-"Day_11"
+colnames(GermSproutCount)[7]<-"Day_16"
+colnames(GermSproutCount)[8]<-"Day_21"
+colnames(GermSproutCount)[9]<-"Day_4"
+colnames(GermSproutCount)[10]<-"Day_12"
+colnames(GermSproutCount)[11]<-"Day_13"
+colnames(GermSproutCount)[12]<-"Day_28"
+colnames(GermSproutCount)[13]<-"Day_5"
+colnames(GermSproutCount)[14]<-"Day_6"
+colnames(GermSproutCount)[15]<-"Day_7"
+colnames(GermSproutCount)[16]<-"Day_9"
+colnames(GermSproutCount)[17]<-"Day_10"
+colnames(GermSproutCount)[18]<-"Day_2"
+colnames(GermSproutCount)[19]<-"Day_3"
+colnames(GermSproutCount)[20]<-"Day_14"
+colnames(GermSproutCount)[21]<-"Day_15"
+colnames(GermSproutCount)[22]<-"Day_17"
+colnames(GermSproutCount)[23]<-"Day_18"
+colnames(GermSproutCount)[24]<-"Day_20"
+colnames(GermSproutCount)[25]<-"Day_19"
+colnames(GermSproutCount)[26]<-"Day_24"
+colnames(GermSproutCount)[27]<-"Day_1"
+
+#Organizing the columns in order
+GermSproutCount<-GermSproutCount[c("Species","Treatment","SiteID","DidNotSprout","Day_1","Day_2","Day_3","Day_4","Day_5","Day_6","Day_7","Day_8","Day_9","Day_10","Day_11","Day_12","Day_13","Day_14","Day_15","Day_16","Day_17","Day_18","Day_19","Day_20","Day_21","Day_24","Day_28")]
+
+#get the sum of all the columns and figure out the proportion sprouted
+GermSproutCount<-GermSproutCount%>%
+  mutate(TotalSprouted=(Day_1+Day_2+Day_3+Day_4+Day_5+Day_6+Day_7+Day_8+Day_9+Day_10+Day_11+Day_12+Day_13+Day_14+Day_15+Day_16+Day_17+Day_18+Day_19+Day_20+Day_21+Day_24+Day_28))
+
+#sum not sprouted and sprouted to get the total number of props per treatment
+GermSproutCount<-GermSproutCount%>%
+  mutate(TotalProps=TotalSprouted+DidNotSprout)
+
+
+#rename the dataframe so I can rewrite over the values in the columns, and after double check things to make sure worked correctly
+PropGermSproutCount<-GermSproutCount
+
+#this is looping through columns 4:27 (Day 1:Day 28) and adding so we know the cumulative sum of props that had sprouted on each day (if the column is column 4, we just want column four, because that is day one and there are no previous days, if it is any column after, through column 27 we want to add the value to the one before it)
+for(i in 1:nrow(PropGermSproutCount)){
+  for(j in 5:27){
+    if(j == 5){
+      PropGermSproutCount[i,j] <- PropGermSproutCount[i,j]
+    }
+    else{
+      PropGermSproutCount[i,j] <- (PropGermSproutCount[i,j]+PropGermSproutCount[i,j-1])
+    }
+  }
+}
+
+#rename the dataframe again 
+DPropGermSproutCount<-PropGermSproutCount 
+
+#now i am taking each column and dividing it by the total number of props present
+for(i in 5:27){
+  DPropGermSproutCount[,i]<-DPropGermSproutCount[,i]/DPropGermSproutCount[,29]
+}
+
+#now I am plotting the proportion of props that sprouted on each day, separated by treatment for each species
+
+
+#first fitlering for species and site, then pivoting longer so I can plot
+AVGEpropplotDF<-DPropGermSproutCount%>%
+  filter(Species=="AVGE")%>%
+  filter(SiteID=="Compass Point")%>%
+  pivot_longer(cols=!c(Species,Treatment, SiteID, DidNotSprout, TotalSprouted, TotalProps), names_to="Day", values_to="ProportionSprouted")
+
+
+#now we need to separate out the column names back into day and number so  r will recognize them as numbers and plot them in order
+AVGEpropplotDF<-AVGEpropplotDF%>%separate(`Day`, into = c("Day","DayNumber"), sep = "_")
+
+AVGEpropplotDF$`DayNumber`<-as.numeric(AVGEpropplotDF$`DayNumber`)
+
+
+#making the plot
+AVGEpropplot<-AVGEpropplotDF%>%
+  ggplot(aes(x=DayNumber, y=ProportionSprouted, color=Treatment))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Days After Intake")+
+  ylab("Proportion of Propagules Sprouted")+
+  ggtitle("AVGE Collected From Compass Point")+
+  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
+
+
+AVGEpropplot
+```
+
+Making figure 8
+
+```{r Functionify the plotmaking}
+library(patchwork)#for stitching plots together
+
+#rearragning the code above so i can put it into a function, first fitlering for species and site, then pivoting longer so I can plot
+
+LongFrame<-DPropGermSproutCount%>%
+  pivot_longer(cols=!c(Species,Treatment, SiteID, DidNotSprout, TotalSprouted, TotalProps), names_to="Day", values_to="ProportionSprouted")%>%
+  separate(`Day`, into = c("Day","DayNumber"), sep = "_")%>%
+  mutate(DayNumber=as.numeric(DayNumber))%>%
+  filter(Species=="AVGE"&SiteID=="Compass Point")%>%
+   ggplot(aes(x=DayNumber, y=ProportionSprouted, color=Treatment))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Days After Intake")+
+  ylab("Proportion of Propagules Sprouted")+
+  ggtitle("AVGE Collected From Compass Point")+
+  scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
+  
+LongFrame
+
+#make my titles as objects so they can have sci name italisized
+LV<-expression(italic("L. racemosa")~"Seeds Collected From Vessup Salt Pond")
+AV<-expression(italic("A. germinans")~"Propagules Collected From Vessup Salt Pond")
+LC<-expression(italic("L. racemosa")~"Seeds Collected From Compass Point")
+AC<-expression(italic("A. germinans")~"Propagules Collected From Compass Point")
+LS<-expression(italic("L. racemosa")~"Seeds Collected From STEER")
+AS<-expression(italic("A. germinans")~"Propagules Collected From STEER")
+
+#modifying treatment labels
+treatment_labels <- c(
+  "Air" = "No Substrate",
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil"
+)
+
+
+#now turning my plot and code into a function, that plots my data 
+PropPlot<-function(data, species_value, siteid_value,title){data%>%
+  pivot_longer(cols=!c(Species,Treatment, SiteID, DidNotSprout, TotalSprouted, TotalProps), 
+               names_to="Day", 
+               values_to="ProportionSprouted")%>%
+  separate(Day, into = c("Day","DayNumber"), sep = "_")%>%
+  mutate(DayNumber=as.numeric(DayNumber))%>%
+  filter(Species==species_value & SiteID==siteid_value)%>%
+   ggplot(aes(x= DayNumber, y= ProportionSprouted, color= Treatment))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Days After Intake")+
+  ylab("Proportion Sprouted")+
+  ggtitle(title)+
+  scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"), labels=treatment_labels)+
+  theme(plot.margin = margin(10, 10, 10, 10),plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))}
+
+#plotting each combo of species and site
+
+#Compass Point AVGE  
+CompassAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "Compass Point",AC)
+
+CompassAVGEprop
+
+#Compass Point LARA
+CompassLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "Compass Point",LC)
+
+CompassLARAprop
+
+#STEER basin AVGE  
+SteerAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "STEER", AS)
+
+SteerAVGEprop
+
+#STEER basin LARA
+SteerLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "STEER", LS)
+
+SteerLARAprop
+
+#Vessup  AVGE  
+VessupAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "Vessup Salt Pond", AV)
+
+VessupAVGEprop
+
+#Vessup LARA
+VessupLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "Vessup Salt Pond",LV)
+
+VessupLARAprop
+
+
+#patch the plots together and collect all the legends into one
+PPatchPlot<-VessupLARAprop+CompassLARAprop+SteerLARAprop+VessupAVGEprop+CompassAVGEprop+SteerAVGEprop+plot_layout(guides = 'collect')
+
+PPatchPlot
+
+#patch vertically 
+
+p1<-VessupLARAprop+VessupAVGEprop+plot_layout(guides = 'collect')
+p1
+p2<-CompassLARAprop+CompassAVGEprop+plot_layout(guides = 'collect')
+p3<-SteerLARAprop+SteerAVGEprop+plot_layout(guides = 'collect')
+
+VPatch<-p1/p2/p3+plot_layout(guides = 'collect')
+VPatch
+
+```
+
+
+look at all the props together not including site Making figure 6
+
+```{r}
+
+#grouping by species treatment and site ID, and days until sprout, then summing together all the 1s in the day column so I can see how many sprouted on each of the days until sprouting
+TreatPlot<-GermSprout%>%
+  group_by(Species,Treatment,DaysUntilSprout)%>%
+  summarise(sum(Day))
+
+#change the class of the resulting object and columns
+TreatPlot<-as.data.frame(TreatPlot)
+
+
+#pivoting wider, have the days across the top and the number sprouted that day as values
+TreatPlot<-TreatPlot%>%
+  pivot_wider(names_from =DaysUntilSprout, values_from=`sum(Day)`)
+
+#filling in blanks with zeros
+TreatPlot[is.na(TreatPlot)]<-0
+
+#rename columns instead of #s, when they are numbers It will not let me call them 
+colnames(TreatPlot)[3]<-"DidNotSprout"
+colnames(TreatPlot)[4]<-"Day_4"
+colnames(TreatPlot)[5]<-"Day_8"
+colnames(TreatPlot)[6]<-"Day_11"
+colnames(TreatPlot)[7]<-"Day_12"
+colnames(TreatPlot)[8]<-"Day_13"
+colnames(TreatPlot)[9]<-"Day_16"
+colnames(TreatPlot)[10]<-"Day_21"
+colnames(TreatPlot)[11]<-"Day_28"
+colnames(TreatPlot)[12]<-"Day_2"
+colnames(TreatPlot)[13]<-"Day_3"
+colnames(TreatPlot)[14]<-"Day_5"
+colnames(TreatPlot)[15]<-"Day_6"
+colnames(TreatPlot)[16]<-"Day_7"
+colnames(TreatPlot)[17]<-"Day_9"
+colnames(TreatPlot)[18]<-"Day_10"
+colnames(TreatPlot)[19]<-"Day_14"
+colnames(TreatPlot)[20]<-"Day_15"
+colnames(TreatPlot)[21]<-"Day_17"
+colnames(TreatPlot)[22]<-"Day_18"
+colnames(TreatPlot)[23]<-"Day_20"
+colnames(TreatPlot)[24]<-"Day_19"
+colnames(TreatPlot)[25]<-"Day_24"
+colnames(TreatPlot)[26]<-"Day_1"
+
+
+#Organizing the columns in order
+TreatPlot<-TreatPlot[c("Species","Treatment","DidNotSprout","Day_1","Day_2","Day_3","Day_4","Day_5","Day_6","Day_7","Day_8","Day_9","Day_10","Day_11","Day_12","Day_13","Day_14","Day_15","Day_16","Day_17","Day_18","Day_19","Day_20","Day_21","Day_24","Day_28")]
+
+#get the sum of all the columns and figure out the proportion sprouted
+TreatPlot<-TreatPlot%>%
+  mutate(TotalSprouted=(Day_1+Day_2+Day_3+Day_4+Day_5+Day_6+Day_7+Day_8+Day_9+Day_10+Day_11+Day_12+Day_13+Day_14+Day_15+Day_16+Day_17+Day_18+Day_19+Day_20+Day_21+Day_24+Day_28))
+
+#sum not sprouted and sprouted to get the total number of props per treatment
+TreatPlot<-TreatPlot%>%
+  mutate(TotalProps=TotalSprouted+DidNotSprout)
+
+
+#rename the dataframe so I can rewrite over the values in the columns, and after double check things to make sure worked correctly
+TreatPlot1<-TreatPlot
+
+
+#this is looping through columns 4:27 (Day 1:Day 28) and adding so we know the cumulative sum of props that had sprouted on each day (if the column is column 4, we just want column four, because that is day one and there are no previous days, if it is any column after, through column 27 we want to add the value to the one before it)
+for(i in 1:nrow(TreatPlot1)){
+  for(j in 4:26){
+    if(j == 4){
+      TreatPlot1[i,j] <- TreatPlot1[i,j]
+    }
+    else{
+      TreatPlot1[i,j] <- (TreatPlot1[i,j]+TreatPlot1[i,j-1])
+    }
+  }
+}
+
+
+#now i am taking each column and dividing it by the total number of props present
+for(i in 4:26){
+  TreatPlot1[,i]<-TreatPlot1[,i]/TreatPlot1[,28]
+}
+
+
+#first filtering for species and site, then pivoting longer so I can plot
+AVGEpropplotDF<-TreatPlot1%>%
+  filter(Species=="AVGE")%>%
+  pivot_longer(cols=!c(Species,Treatment, DidNotSprout, TotalSprouted, TotalProps), names_to="Day", values_to="ProportionSprouted")
+
+
+
+#now we need to separate out the column names back into day and number so  r will recognize them as numbers and plot them in order
+AVGEpropplotDF<-AVGEpropplotDF%>%separate(`Day`, into = c("Day","DayNumber"), sep = "_")
+
+AVGEpropplotDF$`DayNumber`<-as.numeric(AVGEpropplotDF$`DayNumber`)
+
+
+#making the plot
+AVGEpropplot<-AVGEpropplotDF%>%
+  ggplot(aes(x=DayNumber, y=ProportionSprouted, color=Treatment))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Days After Intake")+
+  ylab("Proportion of Propagules Sprouted")+
+  ggtitle(expression("Proportion of" ~italic("A. germinans")~"Propagules Sprouted"))+
+  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"), labels=treatment_labels)+
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
+
+
+AVGEpropplot
+
+#and now we do LARA
+
+
+#first filtering for species and site, then pivoting longer so I can plot
+LARApropplotDF<-TreatPlot1%>%
+  filter(Species=="LARA")%>%
+  pivot_longer(cols=!c(Species,Treatment, DidNotSprout, TotalSprouted, TotalProps), names_to="Day", values_to="ProportionSprouted")
+
+
+#now we need to separate out the column names back into day and number so  r will recognize them as numbers and plot them in order
+LARApropplotDF<-LARApropplotDF%>%separate(`Day`, into = c("Day","DayNumber"), sep = "_")
+
+LARApropplotDF$`DayNumber`<-as.numeric(LARApropplotDF$`DayNumber`)
+
+
+#making the plot
+LARApropplot<-LARApropplotDF%>%
+  ggplot(aes(x=DayNumber, y=ProportionSprouted, color=Treatment))+
+  geom_line()+
+  geom_point()+
+  xlab("Number of Days After Intake")+
+  ylab("Proportion of Seeds Sprouted")+
+   ggtitle(expression("Proportion of" ~italic("L. racemosa")~"Seeds Sprouted"))+
+  scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"), labels=treatment_labels)+
+  theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
+
+
+LARApropplot
+
+totalpatchplot<-LARApropplot+AVGEpropplot+plot_layout(guides = 'collect')
+totalpatchplot
+
+```
+
+This is running a KW test for LARA with the ones that didnt sprout removed plotting results for LARA
+```{r FINAL KW choice LARA}
+library(FSA)#for DunnPost Hoc
+library(rcompanion)#for cldList function
+library(ggforce)#for sina
+
+#2) KW no sprout removed
+TLARA<-lubesprout%>%
+  filter(Species=="LARA")%>%
+  select(SiteID, Treatment, DaysUntilSprout)
+
+TLARA$DaysUntilSprout<-as.numeric(TLARA$DaysUntilSprout)
+
+#filter to remove props that did not sprout
+LARAR<-TLARA%>%
+  filter(DaysUntilSprout!=0)
+
+#calculate average days until sprouting by treatment
+Llubecheck<-lubesprout%>%
+  group_by(Species, Treatment)%>%
+  summarise(mean=mean(DaysUntilSprout))%>%
+  filter(Species=="LARA")
+
+
+
+
+SproutLARAViolinPlot<-LARAR%>%
+  ggplot(aes(x=Treatment, y=DaysUntilSprout, color=Treatment))+#setting my x and y values, 
+  geom_violin()+#
+    geom_sina()+#adds all the dots to the violin plot needs ggforce library
+    geom_boxplot(width=0.1, color="black", alpha=0.2)+
+  geom_point(aes(x=Treatment, y=mean), data=Llubecheck,shape=15, color="red")+
+  ggtitle(expression(italic("L. racemosa") ~ "Treatment Effect on Days Until Sprouting"))+
+  ylab("Days Until Sprout")+
+  xlab("Treatment")+
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+   scale_x_discrete(labels = c(
+  "Air" = "No Substrate",
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil"
+))+
+    scale_color_manual(name = "Treatment", values = c("olivedrab","cornflowerblue","darkblue","salmon4"))+#sets the colors manually of the dots, and outlines of violin plots
+    geom_text(aes(family="serif", fontface="plain"),x= "Air" , y=30, label="ab", colour="black")+#add first letter, family and fontface change font and remove bold
+  geom_text(aes(family="serif", fontface="plain"),x= "Fresh" , y=30, label="a", colour="black")+#add second letter
+  geom_text(aes(family="serif", fontface="plain"), x= "Salt" , y=30, label="b", colour="black")+#third letter 
+  geom_text(aes(family="serif", fontface="plain"), x= "Soil" , y=30, label="b", colour="black")+
+  ylim(0,30)
+
+SproutLARAViolinPlot
+
+bartlett.test(DaysUntilSprout~Treatment, LARAR)
+
+kruskal.test(DaysUntilSprout~Treatment, LARAR)
+
+#	Kruskal-Wallis rank sum test
+
+#data:  DaysUntilSprout by Treatment
+#Kruskal-Wallis chi-squared = 25.094, df = 3, p-value = 1.475e-05
+
+LARADunn=dunnTest(DaysUntilSprout ~ Treatment,
+  data = LARAR)
+
+LARADunn
+
+#         Comparison         Z      P.unadj        P.adj
+#1  Air - Fresh  1.313372 1.890575e-01 3.781150e-01
+#2   Air - Salt -1.021697 3.069241e-01 3.069241e-01
+#3 Fresh - Salt -3.403578 6.650954e-04 3.325477e-03
+#4   Air - Soil -2.130880 3.309900e-02 1.323960e-01
+#5 Fresh - Soil -4.801471 1.575043e-06 9.450260e-06
+#6  Salt - Soil -1.605593 1.083633e-01 3.250899e-01
+
+Lab1 = LARADunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#  Group Letter MonoLetter
+#1   Air     ab         ab
+#2 Fresh      a         a 
+#3  Salt      b          b
+#4  Soil      b          b
+```
+
+This is running KW with the ones that didnt sprout removed for AVGE, and plotting results, combined two plots and create figure 7
+
+```{r FINAL KW choice AVGE}
+#2) KW no sprout removed
+
+TAVGE<-lubesprout%>%
+  filter(Species=="AVGE")%>%
+  select(SiteID, Treatment, DaysUntilSprout)
+
+TAVGE$DaysUntilSprout<-as.numeric(TAVGE$DaysUntilSprout)
+
+Alubecheck<-lubesprout%>%
+  group_by(Species, Treatment)%>%
+  summarise(mean=mean(DaysUntilSprout))%>%
+  filter(Species=="AVGE")
+
+#filter to remove props that did not sprout
+AVGER<-TAVGE%>%
+  filter(DaysUntilSprout!=0)
+
+SproutAVGEViolinPlot<-AVGER%>%
+  ggplot(aes(x=Treatment, y=DaysUntilSprout, color=Treatment))+#setting my x and y values, 
+  geom_violin()+#
+    geom_sina()+#adds all the dots to the violin plot needs ggforce library
+    geom_boxplot(width=0.1, color="black", alpha=0.2)+
+  geom_point(aes(x=Treatment, y=mean), data=Alubecheck,shape=15, color="red")+
+ ggtitle(expression(italic("A. germinans") ~ "Treatment Effect on Days Until Sprouting"))+
+  ylab("Days Until Sprout")+
+  xlab("Treatment")+
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
+    scale_color_manual(name = "Treatment", values = c("olivedrab","cornflowerblue","darkblue","salmon4"))+#sets the colors manually of the dots, and outlines of violin plots
+ scale_x_discrete(labels = c(
+  "Air" = "No Substrate",
+  "Fresh" = "Freshwater",
+  "Salt" = "Saltwater",
+  "Soil" = "Soil"
+))+
+    geom_text(aes(family="serif", fontface="plain"),x= "Air" , y=30, label="a", colour="black")+#add first letter, family and fontface change font and remove bold
+  geom_text(aes(family="serif", fontface="plain"),x= "Fresh" , y=30, label="b", colour="black")+#add second letter
+  geom_text(aes(family="serif", fontface="plain"), x= "Salt" , y=30, label="a", colour="black")+#third letter 
+  geom_text(aes(family="serif", fontface="plain"), x= "Soil" , y=30, label="c", colour="black")+
+  ylim(0,30)
+
+SproutAVGEViolinPlot
+
+bartlett.test(DaysUntilSprout~Treatment, AVGER)
+
+kruskal.test(DaysUntilSprout~Treatment, AVGER)
+
+#Kruskal-Wallis rank sum test
+
+#data:  DaysUntilSprout by Treatment
+#Kruskal-Wallis chi-squared = 91.09, df = 3, p-value < 2.2e-16
+
+AVGEDunn=dunnTest(DaysUntilSprout ~ Treatment,
+  data = AVGER)
+
+AVGEDunn
+
+#      Comparison          Z      P.unadj        P.adj
+#1  Air - Fresh  5.0556550 4.289160e-07 1.715664e-06
+#2   Air - Salt  0.3751177 7.075729e-01 7.075729e-01
+#3 Fresh - Salt -8.9334001 4.131124e-19 2.478674e-18
+#4   Air - Soil  3.3442384 8.250881e-04 2.475264e-03
+#5 Fresh - Soil -3.0955342 1.964587e-03 3.929174e-03
+#6  Salt - Soil  5.5349502 3.113168e-08 1.556584e-07
+
+Lab1 = AVGEDunn$res
+
+cldList(comparison = Lab1$Comparison,
+        p.value    = Lab1$P.adj,
+        threshold  = 0.05)
+
+#  Group Letter MonoLetter
+#1   Air     a         a
+#2 Fresh      b         b
+#3  Salt      a          a
+#4  Soil      c          c
+
+
+
+TreatmentTimePlot<-SproutLARAViolinPlot+SproutAVGEViolinPlot
+TreatmentTimePlot
+
+```
+
+
