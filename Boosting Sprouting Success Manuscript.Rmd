@@ -281,8 +281,9 @@ AVGEFbar1<-ggplot(data=siteAVGE, aes(x=SiteID, y=count, fill=Float))+
             size = 3.0) +
   ylab("Propagule Count")+
   xlab("Collection Site")+
+  scale_x_discrete(labels=c("Compass\nPoint", "Mangrove\nLagoon", "Vessup\nSalt Pond"))+
   scale_fill_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
-                    name = "Bouyancy", labels=c( "Did Not Float", "Floated"))+
+                    name = "Bouyancy", labels=c( "Not Bouyant", "Bouyant"))+
   theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
   
 
@@ -307,7 +308,8 @@ LARAbar1<-ggplot(data=siteLARA, aes(x=SiteID, y=count, fill=Float))+
   ylab("Propagule Count")+
   xlab("Collection Site")+
   scale_fill_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
-                    name = "Bouyancy", labels=c( "Did Not Float", "Floated"))+
+                    name = "Bouyancy", labels=c( "Not Bouyant", "Bouyant"))+
+  scale_x_discrete(labels=c("Compass\nPoint", "Mangrove\nLagoon", "Vessup\nSalt Pond"))+
   theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
 
 LARAbar1
@@ -748,8 +750,8 @@ testplot<-LARA%>%
   ylab("Mass (g)")+
   xlab("Collection Site")+
   theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
-    scale_color_manual(name = "Site", values = c("darkgreen","salmon4", "olivedrab"))#sets the colors manually of the dots, and outlines of violin plots
-
+    scale_color_manual(name = "Site", values = c("darkgreen","salmon4", "olivedrab"))+#sets the colors manually of the dots, and outlines of violin plots
+scale_x_discrete(labels=c("Compass\nPoint", "Mangrove\nLagoon", "Vessup\nSalt Pond"))
 #testplot doesnt include the lettering added in function
   
 
@@ -769,16 +771,16 @@ testplot
 #VSP: letter above VSPfrom KW/Dunn post hoc
 #Yplace: number of units above the max y value you want to put your letters
 
-PropViolinPlot<-function(SPECIES,YVal, title, ylab, CP, SB, VSP,Yplace){SPECIES%>%
+PropViolinPlot<-function(SPECIES,YVal,ylab, CP, SB, VSP,Yplace){SPECIES%>%
   ggplot(aes(x=SiteID, y=YVal, color=SiteID))+#setting my x and y values, 
   geom_violin()+#makes the plot that follows shape of the data
     geom_sina(alpha=0.3)+#adds all the dots to the violin plot needs ggforce library
     geom_boxplot(width=0.1, color="black", alpha=0.5)+
-  ggtitle(title)+
   ylab(ylab)+
   xlab("Collection Site")+
   theme(legend.position="none", plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))+#no legend, centered title, no background
     scale_color_manual(name = "Site", values = c("darkgreen","salmon4", "olivedrab"))+#sets the colors manually of the dots, and outlines of violin plots
+    scale_x_discrete(labels=c("Compass\nPoint", "Mangrove\nLagoon", "Vessup\nSalt Pond"))+
   geom_text(aes(family="serif", fontface="plain"),size=6,x= "Compass Point" , y=Yplace, label=CP, colour="black")+#add first letter, family and fontface change font and remove bold
   geom_text(aes(family="serif", fontface="plain"),size=6,x= "STEER" , y=Yplace, label=SB, colour="black")+#add second letter
   geom_text(aes(family="serif", fontface="plain"),size=6, x= "Vessup Salt Pond" , y=Yplace, label=VSP, colour="black")}#third letter 
@@ -786,18 +788,9 @@ PropViolinPlot<-function(SPECIES,YVal, title, ylab, CP, SB, VSP,Yplace){SPECIES%
 
 #replotting everything with violin plots stacked with boxplots
 
-#making these title objects so I can italisize the sp name in the titles
-title1<-expression(italic("L. racemosa")~"Seed Mass")
-title2<-expression(italic("A. germinans")~"Propagule Mass")
-title3<-expression(italic("L. racemosa")~"Seed Length")
-title4<-expression(italic("A. germinans")~"Propagule Length")
-title5<-expression(italic("L. racemosa")~"Seed Width")
-title6<-expression(italic("A. germinans")~"Propagule Width")
-title7<-expression(italic("A. germinans")~"Radicle Length")
-
 
 #plot LARA mass
-VLARAmass<-PropViolinPlot(LARA, LARA$Mass, title1, "Mass (g)", "a","b","c", 2)
+VLARAmass<-PropViolinPlot(LARA, LARA$Mass, "Mass (g)", "a","b","c", 2)
 
 #set the y limits
 VLARAmass<-VLARAmass+ylim(0,2)
@@ -805,37 +798,37 @@ VLARAmass<-VLARAmass+ylim(0,2)
 VLARAmass
 
 #plot AVGE mass
-VAVGEmass<-PropViolinPlot(AVGE, AVGE$Mass, title2, "Mass (g)", "a", "b","a", 3.7)
+VAVGEmass<-PropViolinPlot(AVGE, AVGE$Mass, "Mass (g)", "a", "b","a", 4)
 VAVGEmass<-VAVGEmass+ylim(0,4)
 VAVGEmass
 
 #plot LARA length
-VLARAlength<-PropViolinPlot(LARA, LARA$PropaguleLength, title3, "Length (cm)", "a", "b","c", 3.5)
+VLARAlength<-PropViolinPlot(LARA, LARA$PropaguleLength, "Length (cm)", "a", "b","c", 3.5)
 
 VLARAlength<-VLARAlength+ylim(1,3.5)
 VLARAlength
 
 #plot AVGE length
-VAVGElength<-PropViolinPlot(AVGE, AVGE$PropaguleLength, title4, "Length (cm)", "a", "b","a", 3.3)
+VAVGElength<-PropViolinPlot(AVGE, AVGE$PropaguleLength, "Length (cm)", "a", "b","a", 4.5)
 
-VAVGElength<-VAVGElength+ylim(0,3.3)
+VAVGElength<-VAVGElength+ylim(0,4.5)
 VAVGElength
 
 #LARA Width
-VLARAwidth<-PropViolinPlot(LARA, LARA$`Width-mm`, title5, "Width (mm)", "a", "b","b", 22)
+VLARAwidth<-PropViolinPlot(LARA, LARA$`Width-mm`, "Width (mm)", "a", "b","b", 24)
 
-VLARAwidth<-VLARAwidth+ylim(0,22)
+VLARAwidth<-VLARAwidth+ylim(0,24)
 VLARAwidth
 
 #AVGE width
-VAVGEwidth<-PropViolinPlot(AVGE, AVGE$`Width-mm`, title6, "Width (mm)", "a", "b","a", 25)
+VAVGEwidth<-PropViolinPlot(AVGE, AVGE$`Width-mm`, "Width (mm)", "a", "b","a", 27)
 
-VAVGEwidth<-VAVGEwidth+ylim(0,25)
+VAVGEwidth<-VAVGEwidth+ylim(0,27)
 VAVGEwidth
 
 #AVGE rad length
 AVGE$`IntakeRadicleLength-cm`<-as.numeric(AVGE$`IntakeRadicleLength-cm`)
-VAVGEradlength<-PropViolinPlot(AVGE, AVGE$`IntakeRadicleLength-cm`, title7, " Radicle Length (cm)", "a", "a","b", 1.65)
+VAVGEradlength<-PropViolinPlot(AVGE, AVGE$`IntakeRadicleLength-cm`, " Radicle Length (cm)", "a", "a","b", 1.65)
 
 VAVGEradlength<-VAVGEradlength+ylim(0,1.65)
 VAVGEradlength
@@ -850,9 +843,9 @@ CharPlot
 ggsave(
   filename = "IntakeCharPlot1.jpg",  # output file name
   plot = CharPlot,            # your ggplot object
-  width = 3000,                      # width in pixels
-  height = 3200,                     # height in pixels
-  units = "px",                      # set units to pixels
+  width = 8,                      # width in pixels
+  height = 10,                     # height in pixels
+  units = "in",                      # set units to pixels
   dpi = 300                          # resolution
 )
 
@@ -860,7 +853,6 @@ ggsave(
 
 Look at sprout or not sprout as a binary, 0/1 then plot and run logistic regression to see the effect of the prop characteristics on whether or not things sprouted
 Running all combonations of AVGE logistic regressions, the reason I do this is to make sure I select the correct explanatory variables in the model, so i need to run all combinations of the non correlated variables. Then I look at the AIC value at the bottom. AIC looks at model fit and penalizes for complexity (more variables included), the model with the lower AICs are better 
-
 
 ```{r}
 #treatment only
@@ -1111,10 +1103,9 @@ summary(masslogitR)
 #191.3
 ```
 
+Visualized AVGE in two ways one just holding radL and L constant and generating results for float and not float
 
-Visualized AVGE in two ways one just holding radL and L constant and generating results for float and not float, the other varying intake RL across observed values
-
-Making a figure predicting sprouting using the best model generated for AVGE
+Making a figure predicting sprouting using the best model generated for AVGE makes figure 5b
 ```{r AVGE logit Figure}
 #here I am creating a new dataframe to hold the predicted values, I am keeping length constant at the mean length value, and radicle length constant also, so predicted values only reflect treatment and buoyancy, expand.grid creates all combos of supplied vectors (my float and treatment vectors) keeping propagule and radicle length constant at the mean
 AVGEpredict<- expand.grid(
@@ -1144,7 +1135,7 @@ AVGElogitplot<-ggplot(AVGEpredict, aes(x = Treatment, y = prob, color = Float)) 
   labs(y = "Predicted sprouting probability",
        x = "Treatment",
        color = "Float")+
-  ggtitle(expression(italic("A. germinans")~"Predicted Sprouting Probability"))+
+  #ggtitle(expression(italic("A. germinans")~"Predicted Sprouting Probability"))+
    scale_color_manual(values = c("Y" = "lightblue", "N" = "darkblue"),
                     name = "Bouyancy", labels=c( "Floated", "Did Not Float"))+
   theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
@@ -1324,8 +1315,8 @@ summary(BasicM)
 
 ```
 
-What does it look like if i hold mass constant and have site and treatment?
 
+Plot logistic regression results for LARA, Combine with AVGE results and make figure 5
 ```{r}
 
 LARApredict1<- expand.grid(
@@ -1354,9 +1345,9 @@ LARAlogitplot<-ggplot(LARApredict1, aes(x = Treatment, y = pred_prob, color = Si
   labs(y = "Predicted sprouting probability",
        x = "Treatment",
        color = "SiteID")+
-  ggtitle(expression(italic("L. racemosa")~"Predicted Sprouting Probability"))+
+  #ggtitle(expression(italic("L. racemosa")~"Predicted Sprouting Probability"))+
    scale_color_manual(values = c("Vessup Salt Pond" = "olivedrab", "STEER" = "salmon4","Compass Point"="darkgreen"),
-                    name = "Site ID", labels=c( "Vessup Salt Pond", "STEER","Compass Point"))+
+                    name = "Site ID", labels=c( "Vessup Salt Pond", "Mangrove Lagoon","Compass Point"))+
   theme(plot.title = element_text(hjust = 0.5),panel.background = element_rect(fill = "white", colour = "grey50"))+
   scale_x_discrete(labels = c(
   "Fresh" = "Freshwater",
@@ -1372,7 +1363,15 @@ LARAlogitplot<-ggplot(LARApredict1, aes(x = Treatment, y = pred_prob, color = Si
 finallogitplots<-LARAlogitplot+AVGElogitplot
 finallogitplots
 
+ggsave("LogitPlot.png",
+       plot = finallogitplots,
+       width = 10,
+       height = 3.3,
+       units = "in",
+       dpi = 300)
+
 ```
+
 Calculating proportion sprouted on each day for plotting, visualized in different ways
 ```{r Determine Percent Germinated}
 library(lubridate)
@@ -1497,7 +1496,7 @@ AVGEpropplot<-AVGEpropplotDF%>%
   geom_point()+
   xlab("Number of Days After Intake")+
   ylab("Proportion of Propagules Sprouted")+
-  ggtitle("AVGE Collected From Compass Point")+
+  #ggtitle("AVGE Collected From Compass Point")+
   scale_color_manual(name="Treatment",values=c("azure4","cornflowerblue","darkblue","salmon4"))+
   theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
 
@@ -1505,7 +1504,7 @@ AVGEpropplot<-AVGEpropplotDF%>%
 AVGEpropplot
 ```
 
-Making figure 8
+Making figure 6
 
 ```{r Functionify the plotmaking}
 library(patchwork)#for stitching plots together
@@ -1522,19 +1521,13 @@ LongFrame<-DPropGermSproutCount%>%
   geom_point()+
   xlab("Number of Days After Intake")+
   ylab("Proportion of Propagules Sprouted")+
-  ggtitle("AVGE Collected From Compass Point")+
+  #ggtitle("AVGE Collected From Compass Point")+
   scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"))+
   theme(plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))
   
 LongFrame
 
-#make my titles as objects so they can have sci name italisized
-LV<-expression(italic("L. racemosa")~"Seeds Collected From Vessup Salt Pond")
-AV<-expression(italic("A. germinans")~"Propagules Collected From Vessup Salt Pond")
-LC<-expression(italic("L. racemosa")~"Seeds Collected From Compass Point")
-AC<-expression(italic("A. germinans")~"Propagules Collected From Compass Point")
-LS<-expression(italic("L. racemosa")~"Seeds Collected From STEER")
-AS<-expression(italic("A. germinans")~"Propagules Collected From STEER")
+
 
 #modifying treatment labels
 treatment_labels <- c(
@@ -1546,7 +1539,7 @@ treatment_labels <- c(
 
 
 #now turning my plot and code into a function, that plots my data 
-PropPlot<-function(data, species_value, siteid_value,title){data%>%
+PropPlot<-function(data, species_value, siteid_value){data%>%
   pivot_longer(cols=!c(Species,Treatment, SiteID, DidNotSprout, TotalSprouted, TotalProps), 
                names_to="Day", 
                values_to="ProportionSprouted")%>%
@@ -1556,51 +1549,75 @@ PropPlot<-function(data, species_value, siteid_value,title){data%>%
    ggplot(aes(x= DayNumber, y= ProportionSprouted, color= Treatment))+
   geom_line()+
   geom_point()+
-  xlab("Number of Days After Intake")+
   ylab("Proportion Sprouted")+
-  ggtitle(title)+
   scale_color_manual(name="Treatment",values=c("olivedrab","cornflowerblue","darkblue","salmon4"), labels=treatment_labels)+
-  theme(plot.margin = margin(10, 10, 10, 10),plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))}
+  theme(plot.margin = margin(1, 1, 1, 1),plot.title = element_text(hjust = 0.5), panel.background = element_rect(fill = "white", colour = "grey50"))}
 
 #plotting each combo of species and site
 
 #Compass Point AVGE  
-CompassAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "Compass Point",AC)
+CompassAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "Compass Point")+
+  theme(legend.position = "none")+xlab(" ")
 
 CompassAVGEprop
 
 #Compass Point LARA
-CompassLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "Compass Point",LC)
+CompassLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "Compass Point")+
+  theme(legend.position = "none")+xlab(" ")
 
 CompassLARAprop
 
 #STEER basin AVGE  
-SteerAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "STEER", AS)
+SteerAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "STEER")+ theme(
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.position = "none"
+  )+xlab("Number of Days After Intake")
 
 SteerAVGEprop
 
 #STEER basin LARA
-SteerLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "STEER", LS)
+SteerLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "STEER")+ theme(
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.position = "none"
+  )+xlab(" ")
 
 SteerLARAprop
 
 #Vessup  AVGE  
-VessupAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "Vessup Salt Pond", AV)
+VessupAVGEprop<-PropPlot(DPropGermSproutCount,"AVGE", "Vessup Salt Pond")+ theme(
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  )+xlab(" ")
 
 VessupAVGEprop
 
 #Vessup LARA
-VessupLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "Vessup Salt Pond",LV)
+VessupLARAprop<-PropPlot(DPropGermSproutCount,"LARA", "Vessup Salt Pond")+ theme(
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank(), legend.position = "none"
+  )+xlab(" ")
 
 VessupLARAprop
 
 
-#patch the plots together and collect all the legends into one
-PPatchPlot<-VessupLARAprop+CompassLARAprop+SteerLARAprop+VessupAVGEprop+CompassAVGEprop+SteerAVGEprop+plot_layout(guides = 'collect')
 
-PPatchPlot
+library(patchwork)
 
-#patch vertically 
+
+plott<-(CompassLARAprop+SteerLARAprop+VessupLARAprop)/(CompassAVGEprop+SteerAVGEprop+VessupAVGEprop)
+
+plott
+
+
+plottt<-plott+ + plot_layout(panel_spacing = unit(2, "mm"))
+
+#patch plots together collect legends
 
 p1<-VessupLARAprop+VessupAVGEprop+plot_layout(guides = 'collect')
 p1
