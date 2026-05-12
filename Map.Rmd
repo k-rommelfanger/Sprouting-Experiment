@@ -7,50 +7,19 @@ editor_options:
   chunk_output_type: console
 ---
 
+ Taquanna's Map Code Working 
 ```{r}
-library(sf)
-library(ggplot2)
-library(rnaturalearth)
 
-
-
-land <- ne_countries(
-  scale = 10,   # ← numeric 10, NOT "large"
-  returnclass = "sf"
-)
-
-bbox_thomas <- st_as_sfc(st_bbox(c(
-  xmin = -65.05, ymin = 18.28,
-  xmax = -64.80, ymax = 18.42
-), crs = 4326))
-
-land_thomas <- st_crop(land, bbox_thomas)
-
-ggplot() +
-  geom_sf(data = land_thomas,
-          fill = "grey90",
-          color = "black",
-          linewidth = 0.3) +
-  coord_sf(xlim = c(-65.05, -64.80),
-           ylim = c(18.28, 18.42),
-           expand = FALSE) +
-  theme_minimal()
-
-```
-
-
-```{r}
 # ====== PACKAGES ==============================================================
 library(ggplot2)
-library(sf)
-library(osmdata)
-library(ggspatial)
+library(sf) #spatial data handling 
+library(osmdata)#map data
+library(ggspatial) #mapping
 library(dplyr)
-library(ggrepel)
+library(ggrepel)#label placement
 library(grid)              
-library(rnaturalearth)    
+library(rnaturalearth)#getting mapping data    
 library(rnaturalearthdata)
-library(curl)
 
 # ====== SITE DATA =============================================================
 sites <- data.frame(
@@ -81,9 +50,8 @@ bbox_croix  <- c(xmin = -64.92, ymin = 17.68, xmax = -64.56, ymax = 17.88)
 bbox_global <- c(xmin = -90.00, ymin = 10.00, xmax = -55.00, ymax = 30.00)
 
 # ====== OVERPASS SETTINGS =====================================================
-options(osmdata_overpass_url = "https://overpass.kumi.systems/api/interpreter")
+osmdata::set_overpass_url("https://overpass-api.de/api/interpreter")
 options(osmdata_timeout = 120)
-
 
 fetch_osm_coast <- function(bbox) {
   tryCatch(
@@ -146,7 +114,7 @@ st_thomas_map <- ggplot() +
   labs(title = "MIC Sites in St. Thomas, USVI", x = "Longitude", y = "Latitude") +
   theme_minimal() +
   theme(
-    #legend.position = c(0.03, 0.97),
+    legend.position = c(0.03, 0.97),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "grey80"),
     legend.key.size = grid::unit(0.4, "in"),
@@ -154,8 +122,8 @@ st_thomas_map <- ggplot() +
     legend.title = element_text(size = 13, face = "bold")
   )
 
-st_thomas_map
 
+st_thomas_map
 # ====== ST. CROIX MAP =========================================================
 st_croix_map <- ggplot() +
   { if (!is.null(coastline_croix) && !is.null(coastline_croix$osm_lines))
@@ -193,8 +161,6 @@ st_croix_map <- ggplot() +
     legend.title = element_text(size = 13, face = "bold")
   )
 
-st_croix_map
-
 # ====== CARIBBEAN MAP =========================================================
 # Helper for circle
 circle_df <- function(cx, cy, r_lon = 0.35, r_lat = 0.35, n = 360) {
@@ -218,15 +184,143 @@ caribbean_map <- ggplot() +
   labs(title = "Map of the Caribbean", x = "Longitude", y = "Latitude") +
   theme_minimal() +
   theme(legend.position = "none")  # hide legend here
-caribbean_map
+
 print(caribbean_map)
+st_thomas_map
 # ====== SAVE MAPS =============================================================
 ggsave("st_thomas_map.png", plot = st_thomas_map, width = 10, height = 8, dpi = 300, bg = "white")
 ggsave("st_croix_map.png",  plot = st_croix_map,  width = 10, height = 8, dpi = 300, bg = "white")
 ggsave("caribbean_map.png", plot = caribbean_map, width = 10, height = 8, dpi = 300, bg = "white")
 
+```
+
+Adapting to what I need for Sprouting Map
+```{r}
+
+# ====== PACKAGES ==============================================================
+library(ggplot2)
+library(sf)
+library(osmdata)
+library(ggspatial)
+library(dplyr)
+library(ggrepel)
+library(grid)              
+library(rnaturalearth)    
+library(rnaturalearthdata)
+
+# ====== SITE DATA =============================================================
+sites <- data.frame(
+  Name = c("Vessup Salt Pond", "Mangrove Lagoon", "Compass Point"),
+  Latitude = c(18.326659, 18.316991, 18.318825),
+  Longitude = c(-64.849950, -64.874902,-64.865781)
+)
+
+sites_sf <- st_as_sf(sites, coords = c("Longitude", "Latitude"), crs = 4326)
 
 
+# ====== BOUNDING BOXES ========================================================
+bbox_thomas <- c(xmin = -65.05, ymin = 18.28, xmax = -64.80, ymax = 18.42)
 
+bbox_global <- c(xmin = -90.00, ymin = 10.00, xmax = -55.00, ymax = 30.00)
+
+# ====== OVERPASS SETTINGS =====================================================
+osmdata::set_overpass_url("https://overpass-api.de/api/interpreter")
+
+
+fetch_osm_coast <- function(bbox) {
+  tryCatch(
+    {
+      opq(bbox = bbox, timeout = 120) |>
+        add_osm_feature(key = "natural", value = "coastline") |>
+        osmdata_sf()
+    },
+    error = function(e) NULL
+  )
+}
+
+# OSM for islands
+coastline_thomas <- fetch_osm_coast(bbox_thomas)
+
+
+# Natural Earth for Caribbean
+coast_world <- rnaturalearth::ne_coastline(scale = "medium", returnclass = "sf")
+carib_poly <- sf::st_sfc(
+  sf::st_polygon(list(matrix(c(
+    -90, 10,
+    -55, 10,
+    -55, 30,
+    -90, 30,
+    -90, 10
+  ), ncol = 2, byrow = TRUE))),
+  crs = 4326
+)
+coast_carib <- suppressWarnings(sf::st_intersection(coast_world, carib_poly))
+
+
+# ====== COLORS & SHAPES =======================================================
+colors <- c("School" = "#3366FF", "Field Site" = "#33CC33")
+shape_vals <- c("School" = 16, "Field Site" = 17)
+
+# ====== ST. THOMAS MAP ========================================================
+st_thomas_map <- ggplot() +
+  { if (!is.null(coastline_thomas) && !is.null(coastline_thomas$osm_lines))
+    geom_sf(data = coastline_thomas$osm_lines, color = "black", linewidth = 0.4)
+  } +
+  geom_sf(data = sites_sf, color="darkgreen", size = 3) +
+  geom_text_repel(
+    data = sites_sf,
+    aes(geometry = geometry, label = Name),
+    stat = "sf_coordinates",
+    size = 3, max.overlaps = Inf, nudge_y = 0.005
+  ) +
+  coord_sf(xlim = bbox_thomas[c("xmin", "xmax")],
+           ylim = bbox_thomas[c("ymin", "ymax")], expand = FALSE) +
+  #scale_color_manual(values = "green", name = "Site") +
+  #scale_shape_manual(values = shape_vals, name = "Site type") +
+ #guides(
+    #color = guide_legend(order = 1, override.aes = list(size = 5)),
+    #shape = guide_legend(order = 1, override.aes = list(size = 5))) +
+  annotation_north_arrow(
+    location = "tr", which_north = "true",
+    pad_x = grid::unit(0.9, "in"), pad_y = grid::unit(0.7, "in"),
+    style = north_arrow_fancy_orienteering()
+  ) +
+  labs(x = "Longitude", y = "Latitude") +
+  theme_minimal()
+
+
+st_thomas_map
+
+
+# ====== CARIBBEAN MAP =========================================================
+# Helper for circle
+circle_df <- function(cx, cy, r_lon = 0.35, r_lat = 0.35, n = 360) {
+  th <- seq(0, 2*pi, length.out = n)
+  data.frame(x = cx + r_lon * cos(th), y = cy + r_lat * sin(th))
+}
+usvi_ring <- circle_df(cx = -64.75, cy = 18.35, r_lon = 0.35, r_lat = 0.35)
+
+caribbean_map <- ggplot() +
+  geom_sf(data = coast_carib, color = "black", linewidth = 0.4) + #coast outline
+  coord_sf(xlim = c(-90, -55), ylim = c(10, 30), expand = FALSE) + #set lat long range visible to caribbean
+  geom_path(data = usvi_ring, aes(x, y),
+            color = "red", linewidth = 1.0) +
+ # annotate("text", x = -64.8, y = 18.95, label = "U. S. Virgin Islands", size = 4, fontface = "bold") +
+  annotation_north_arrow(
+    location = "tr", which_north = "true",
+    pad_x = grid::unit(0.7, "in"), pad_y = grid::unit(0.3, "in"),
+    style = north_arrow_fancy_orienteering()
+  ) +
+  #annotation_scale(location = "tr", unit_category = "metric")+
+  labs( x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(legend.position = "none")  # hide legend here
+
+caribbean_map
+
+# ====== SAVE MAPS =============================================================
+ggsave("st_thomas_map.png", plot = st_thomas_map, width = 10, height = 8, dpi = 300, bg = "white")
+
+ggsave("caribbean_map.png", plot = caribbean_map, width = 10, height = 8, dpi = 300, bg = "white")
 ```
 
