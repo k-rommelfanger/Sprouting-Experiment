@@ -256,6 +256,7 @@ sprout<-sprout%>%
 unique(sprout$Fate)
 
 sprout$Treatment<-as.factor(sprout$Treatment)
+sprout$RemovalDate<-mdy(sprout$RemovalDate)
 
 #make a column showing time until either sprouted or removed
 sprout<-sprout%>%
