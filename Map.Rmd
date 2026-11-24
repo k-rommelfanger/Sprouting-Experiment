@@ -188,9 +188,9 @@ caribbean_map <- ggplot() +
 print(caribbean_map)
 st_thomas_map
 # ====== SAVE MAPS =============================================================
-ggsave("st_thomas_map.png", plot = st_thomas_map, width = 10, height = 8, dpi = 300, bg = "white")
-ggsave("st_croix_map.png",  plot = st_croix_map,  width = 10, height = 8, dpi = 300, bg = "white")
-ggsave("caribbean_map.png", plot = caribbean_map, width = 10, height = 8, dpi = 300, bg = "white")
+#ggsave("st_thomas_map.png", plot = st_thomas_map, width = 10, height = 8, dpi = 300, bg = "white")
+#ggsave("st_croix_map.png",  plot = st_croix_map,  width = 10, height = 8, dpi = 300, bg = "white")
+#ggsave("caribbean_map.png", plot = caribbean_map, width = 10, height = 8, dpi = 300, bg = "white")
 
 ```
 

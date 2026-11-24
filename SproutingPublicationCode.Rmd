@@ -97,9 +97,9 @@ LARAsprout<-LARA%>%
 
 
 #%>%
-  filter(sprouted==1)%>%
-  ggplot(aes(x=SiteID, y=N, fill=Treatment))+
-  geom_col(position="dodge")
+  #filter(sprouted==1)%>%
+  #ggplot(aes(x=SiteID, y=N, fill=Treatment))+
+  #geom_col(position="dodge")
 
 LARAsprout
 
